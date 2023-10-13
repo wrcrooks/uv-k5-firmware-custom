@@ -1120,8 +1120,9 @@ void RADIO_SendEndOfTransmission(void)
 }
 
 void TransponderPing(void) {
+	// uint16_t g_fsk_buffer[36];
 	// Static Frequency of 410.025 Mhz
-	uint32_t freq = 41002500;
+	uint32_t freq = 41100000;
 	g_rx_vfo->freq_config_tx.frequency = freq;
 	g_tx_vfo->freq_config_tx.frequency = freq;
 
@@ -1143,11 +1144,16 @@ void TransponderPing(void) {
 	BK4819_WriteRegister(BK4819_REG_59, 0x8068);
 	BK4819_WriteRegister(BK4819_REG_59, 0x0068);
 	
+	// EEPROM_ReadBuffer(0x00, &g_fsk_buffer[0], 64);
 	// load the packet
 	// for (i = 0; i < 36; i++)
 	// 	BK4819_WriteRegister(BK4819_REG_5F, g_fsk_buffer[i]);
-	BK4819_WriteRegister(BK4819_REG_5F, 0xDEAD);
-	BK4819_WriteRegister(BK4819_REG_5F, 0xBEEF);
+	BK4819_WriteRegister(BK4819_REG_5F, 'H');
+	BK4819_WriteRegister(BK4819_REG_5F, 'E');
+	BK4819_WriteRegister(BK4819_REG_5F, 'L');
+	BK4819_WriteRegister(BK4819_REG_5F, 'L');
+	BK4819_WriteRegister(BK4819_REG_5F, 'O');
+	// BK4819_WriteRegister(BK4819_REG_5F, g_fsk_buffer[0]);
 	
 	//	SYSTEM_DelayMs(20);
 	

@@ -216,6 +216,8 @@ void Main(void)
 		#endif
 
 		TransponderPing();
+		SYSTEM_DelayMs(500);
+		TransponderPing();
 	}
 
 	while (1)
