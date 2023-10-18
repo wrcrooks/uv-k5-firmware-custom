@@ -151,23 +151,19 @@ extern const uint16_t        noaa_count_down_10ms;
 extern const uint16_t        noaa_count_down_2_10ms;
 extern const uint16_t        noaa_count_down_3_10ms;
 
-extern const uint16_t        dual_watch_count_after_tx_10ms;
-extern const uint16_t        dual_watch_count_after_rx_10ms;
-extern const uint16_t        dual_watch_count_after_1_10ms;
-extern const uint16_t        dual_watch_count_after_2_10ms;
-extern const uint16_t        dual_watch_count_toggle_10ms;
-extern const uint16_t        dual_watch_count_noaa_10ms;
 #ifdef ENABLE_VOX
-	extern const uint16_t    dual_watch_count_after_vox_10ms;
+	extern const uint16_t    dual_watch_delay_after_vox_10ms;
 #endif
+extern const uint16_t        dual_watch_delay_after_tx_10ms;
+extern const uint16_t        dual_watch_delay_toggle_10ms;
+extern const uint16_t        dual_watch_delay_noaa_10ms;
 
-extern const uint16_t        scan_pause_1_10ms;
-extern const uint16_t        scan_pause_2_10ms;
-extern const uint16_t        scan_pause_3_10ms;
-extern const uint16_t        scan_pause_4_10ms;
-extern const uint16_t        scan_pause_5_10ms;
-extern const uint16_t        scan_pause_6_10ms;
-extern const uint16_t        scan_pause_7_10ms;
+extern const uint16_t        scan_pause_code_10ms;
+extern const uint16_t        scan_pause_css_10ms;
+extern const uint16_t        scan_pause_ctcss_10ms;
+extern const uint16_t        scan_pause_cdcss_10ms;
+extern const uint16_t        scan_pause_freq_10ms;
+extern const uint16_t        scan_pause_chan_10ms;
 
 extern const uint8_t         g_mic_gain_dB_2[5];
 
@@ -191,13 +187,18 @@ extern uint8_t               g_setting_backlight_on_tx_rx;
 #ifdef ENABLE_AM_FIX_TEST1
 	extern uint8_t           g_setting_am_fix_test1;
 #endif
-#ifdef ENABLE_AUDIO_BAR
+#ifdef ENABLE_TX_AUDIO_BAR
 	extern bool              g_setting_mic_bar;
+#endif
+#ifdef ENABLE_RX_SIGNAL_BAR
+	extern bool              g_setting_rssi_bar;
 #endif
 extern bool                  g_setting_live_dtmf_decoder;
 extern uint8_t               g_setting_battery_text;
 
-extern uint8_t               g_setting_contrast;
+#ifdef ENABLE_CONTRAST
+	extern uint8_t           g_setting_contrast;
+#endif
 
 extern uint8_t               g_setting_side1_short;
 extern uint8_t               g_setting_side1_long;
@@ -224,10 +225,8 @@ extern volatile uint16_t     g_battery_save_count_down_10ms;
 extern volatile bool         g_power_save_expired;
 extern volatile bool         g_schedule_power_save;
 
-extern volatile bool         g_schedule_dual_watch;
-
-extern volatile uint16_t     g_dual_watch_count_down_10ms;
-extern volatile bool         g_dual_watch_count_down_expired;
+extern volatile uint16_t     g_dual_watch_delay_10ms;
+extern volatile bool         g_dual_watch_delay_down_expired;
 
 extern volatile uint8_t      g_serial_config_count_down_500ms;
 
@@ -300,19 +299,18 @@ extern bool                  g_flag_end_tx;
 extern uint16_t              g_low_batteryCountdown;
 extern reception_mode_t      g_rx_reception_mode;
 
-extern uint8_t               g_scan_next_channel;
-extern uint8_t               g_scan_restore_channel;
-extern scan_next_chan_t      g_scan_current_scan_list;
-extern uint32_t              g_scan_restore_frequency;
-extern bool                  g_scan_keep_frequency;
-extern bool                  g_scan_pause_mode;
-extern volatile uint16_t     g_scan_pause_10ms;
-extern scan_state_dir_t      g_scan_state_dir;
+extern uint8_t               g_scan_next_channel;      //
+extern scan_next_chan_t      g_scan_current_scan_list; //
+extern uint8_t               g_scan_restore_channel;   // the channel   we were on before starting the RF scan
+extern uint32_t              g_scan_restore_frequency; // the frequency we were on before starting the RF scan
+extern bool                  g_scan_pause_mode;        // set if we're paused on a channel or frequency ?
+extern volatile uint16_t     g_scan_pause_10ms;        // ticks till we move to next channel/frequency
+extern scan_state_dir_t      g_scan_state_dir;         // the direction we're scanning in
 
 
 extern bool                  g_rx_vfo_is_active;
-extern uint8_t               g_alarm_tone_counter;
-extern uint16_t              g_alarm_running_counter;
+extern uint16_t              g_alarm_tone_counter_10ms;
+extern uint16_t              g_alarm_running_counter_10ms;
 extern uint8_t               g_menu_list_count;
 extern uint8_t               g_backup_cross_vfo_rx_tx;
 #ifdef ENABLE_NOAA

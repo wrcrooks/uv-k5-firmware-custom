@@ -88,7 +88,7 @@ void     BK4819_SetupSquelch(
 
 void     BK4819_SetAF(BK4819_af_type_t AF);
 void     BK4819_RX_TurnOn(void);
-void     BK4819_PickRXFilterPathBasedOnFrequency(uint32_t Frequency);
+void     BK4819_set_rf_filter_path(uint32_t Frequency);
 void     BK4819_DisableScramble(void);
 void     BK4819_EnableScramble(uint8_t Type);
 
@@ -98,8 +98,9 @@ void     BK4819_SetCompander(const unsigned int mode);
 void     BK4819_DisableVox(void);
 void     BK4819_DisableDTMF(void);
 void     BK4819_EnableDTMF(void);
-void     BK4819_PlayTone(uint16_t Frequency, bool bTuningGainSwitch);
-void     BK4819_PlaySingleTone(const unsigned int tone_Hz, const unsigned int delay, const unsigned int level, const bool play_speaker);
+void     BK4819_StartTone1(const uint16_t frequency, const unsigned int level, const bool set_dac);
+void     BK4819_StopTones(void);
+void     BK4819_PlayTone(const unsigned int tone_Hz, const unsigned int delay, const unsigned int level);
 void     BK4819_EnterTxMute(void);
 void     BK4819_ExitTxMute(void);
 void     BK4819_Sleep(void);

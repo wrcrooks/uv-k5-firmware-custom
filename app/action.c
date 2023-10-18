@@ -90,8 +90,8 @@ void ACTION_Monitor(void)
 	
 	if (g_scan_state_dir != SCAN_STATE_DIR_OFF)
 	{
-		g_scan_pause_10ms  = scan_pause_1_10ms;
-		g_scan_pause_mode           = true;
+		g_scan_pause_10ms = g_eeprom.scan_hold_time_500ms * 50;
+		g_scan_pause_mode = true;
 	}
 
 	#ifdef g_power_save_expired
@@ -212,16 +212,15 @@ void ACTION_Scan(bool bRestart)
 			
 				APP_stop_scan();
 
-				#ifdef ENABLE_VOICE
-					g_another_voice_id = VOICE_ID_SCANNING_STOP;
-				#endif
-
+				g_request_display_screen = DISPLAY_MAIN;
 				return;
 			}
 
 			// start scanning
 	
 			APP_channel_next(true, SCAN_STATE_DIR_FORWARD);
+
+			g_scan_pause_10ms = 0;   // go NOW
 			
 			#ifdef ENABLE_VOICE
 				AUDIO_SetVoiceID(0, VOICE_ID_SCANNING_BEGIN);
@@ -257,13 +256,7 @@ void ACTION_Scan(bool bRestart)
 	else
 	{	// stop scanning
 		g_monitor_enabled = false;
-	
 		APP_stop_scan();
-	
-		#ifdef ENABLE_VOICE
-			g_another_voice_id = VOICE_ID_SCANNING_STOP;
-		#endif
-	
 		g_request_display_screen = DISPLAY_MAIN;
 	}
 }
@@ -290,10 +283,10 @@ void ACTION_Scan(bool bRestart)
 		
 		#if defined(ENABLE_ALARM) && defined(ENABLE_TX1750)
 			g_alarm_state = b1750 ? ALARM_STATE_TX1750 : ALARM_STATE_TXALARM;
-			g_alarm_running_counter = 0;
+			g_alarm_running_counter_10ms = 0;
 		#elif defined(ENABLE_ALARM)
 			g_alarm_state          = ALARM_STATE_TXALARM;
-			g_alarm_running_counter = 0;
+			g_alarm_running_counter_10ms = 0;
 		#else
 			g_alarm_state = ALARM_STATE_TX1750;
 		#endif

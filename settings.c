@@ -211,8 +211,11 @@ void SETTINGS_SaveSettings(void)
 	State[7] = g_eeprom.mic_sensitivity;
 	EEPROM_WriteBuffer(0x0E70, State);
 
-	//State[0] = 0xFF;
-	State[0] = g_setting_contrast;
+	#ifdef ENABLE_CONTRAST
+		State[0] = g_setting_contrast;
+	#else
+		State[0] = 0xFF;
+	#endif
 	State[1] = g_eeprom.channel_display_mode;
 	State[2] = g_eeprom.cross_vfo_rx_tx;
 	State[3] = g_eeprom.battery_save;
@@ -273,7 +276,7 @@ void SETTINGS_SaveSettings(void)
 		array.roger_mode                     = g_eeprom.roger_mode;
 		array.repeater_tail_tone_elimination = g_eeprom.repeater_tail_tone_elimination;
 		array.tx_vfo                         = g_eeprom.tx_vfo;
-		#ifdef ENABLE_AIRCOPY_FREQ
+		#ifdef ENABLE_AIRCOPY_REMEMBER_FREQ
 			// remember the AIRCOPY frequency
 			array.air_copy_freq              = g_aircopy_freq;
 		#endif
@@ -318,19 +321,25 @@ void SETTINGS_SaveSettings(void)
 	State[3]  = g_setting_174_tx_enable;
 	State[4]  = g_setting_470_tx_enable;
 	State[5]  = g_setting_350_enable;
-	State[6]  = g_setting_scramble_enable;
+	if (!g_setting_scramble_enable)       State[6] &= ~(1u << 0);
+	#ifdef ENABLE_RX_SIGNAL_BAR
+		if (!g_setting_rssi_bar)          State[6] &= ~(1u << 1);
+	#endif
 	if (!g_setting_tx_enable)             State[7] &= ~(1u << 0);
-	if (!g_setting_live_dtmf_decoder) State[7] &= ~(1u << 1);
+	if (!g_setting_live_dtmf_decoder)     State[7] &= ~(1u << 1);
 	State[7] = (State[7] & ~(3u << 2)) | ((g_setting_battery_text & 3u) << 2);
-	#ifdef ENABLE_AUDIO_BAR
+	#ifdef ENABLE_TX_AUDIO_BAR
 		if (!g_setting_mic_bar)           State[7] &= ~(1u << 4);
 	#endif
 	#ifdef ENABLE_AM_FIX
 		if (!g_setting_am_fix)            State[7] &= ~(1u << 5);
 	#endif
 	State[7] = (State[7] & ~(3u << 6)) | ((g_setting_backlight_on_tx_rx & 3u) << 6);
-
 	EEPROM_WriteBuffer(0x0F40, State);
+	
+	memset(State, 0xFF, sizeof(State));
+	State[0] = g_eeprom.scan_hold_time_500ms;
+	EEPROM_WriteBuffer(0x0F48, State);
 }
 
 void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const vfo_info_t *pVFO, uint8_t Mode)
@@ -364,10 +373,11 @@ void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const vfo_info_t *pVFO, 
 	State[2] = (pVFO->freq_config_tx.code_type << 4) | pVFO->freq_config_rx.code_type;
 	State[3] = ((pVFO->am_mode & 1u)           << 4) | pVFO->tx_offset_freq_dir;
 	State[4] =
-		  (pVFO->busy_channel_lock << 4)
-		| (pVFO->output_power      << 2)
-		| (pVFO->channel_bandwidth << 1)
-		| (pVFO->frequency_reverse  << 0);
+		(pVFO->compand           << 6) |
+		(pVFO->busy_channel_lock << 4) |
+		(pVFO->output_power      << 2) |
+		(pVFO->channel_bandwidth << 1) |
+		(pVFO->frequency_reverse  << 0);
 	State[5] = ((pVFO->dtmf_ptt_id_tx_mode & 7u) << 1) | ((pVFO->dtmf_decoding_enable & 1u) << 0);
 	State[6] =  pVFO->step_setting;
 	State[7] =  pVFO->scrambling_type;
@@ -404,13 +414,11 @@ void SETTINGS_UpdateChannel(uint8_t Channel, const vfo_info_t *pVFO, bool keep)
 	if (IS_NOAA_CHANNEL(Channel))
 		return;
 
-	Attributes &= (uint8_t)(~USER_CH_COMPAND);  // default to '0' = compander disabled
-
 	EEPROM_ReadBuffer(Offset, State, sizeof(State));
 
 	if (keep)
 	{
-		Attributes = (pVFO->scanlist_1_participation << 7) | (pVFO->scanlist_2_participation << 6) | (pVFO->compander << 4) | (pVFO->band << 0);
+		Attributes = (pVFO->scanlist_1_participation << 7) | (pVFO->scanlist_2_participation << 6) | (pVFO->band << 0);
 		if (State[Channel & 7u] == Attributes)
 			return; // no change in the attributes .. don't place wear on the eeprom
 	}

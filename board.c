@@ -540,7 +540,9 @@ void BOARD_EEPROM_load(void)
 
 	// 0E78..0E7F
 	EEPROM_ReadBuffer(0x0E78, Data, 8);
-	g_setting_contrast             = (Data[0] > 45) ? 31 : (Data[0] < 26) ? 31 : Data[0];
+	#ifdef ENABLE_CONTRAST
+		g_setting_contrast         = (Data[0] > 45) ? 31 : (Data[0] < 26) ? 31 : Data[0];
+	#endif
 	g_eeprom.channel_display_mode  = (Data[1] < 4) ? Data[1] : MDF_FREQUENCY;    // 4 instead of 3 - extra display mode
 	g_eeprom.cross_vfo_rx_tx       = (Data[2] < 3) ? Data[2] : CROSS_BAND_OFF;
 	g_eeprom.battery_save          = (Data[3] < 5) ? Data[3] : 4;
@@ -627,7 +629,7 @@ void BOARD_EEPROM_load(void)
 		g_eeprom.repeater_tail_tone_elimination = (array.repeater_tail_tone_elimination < 11) ? array.repeater_tail_tone_elimination : 0;
 		g_eeprom.tx_vfo                         = (array.tx_vfo < 2) ? array.tx_vfo : 0;
 
-		#ifdef ENABLE_AIRCOPY_FREQ
+		#ifdef ENABLE_AIRCOPY_REMEMBER_FREQ
 		{
 			unsigned int i;
 			for (i = 0; i < ARRAY_SIZE(FREQ_BAND_TABLE); i++)
@@ -723,11 +725,7 @@ void BOARD_EEPROM_load(void)
 
 	// 0F40..0F47
 	EEPROM_ReadBuffer(0x0F40, Data, 8);
-	#ifdef ENABLE_TX_UNLOCK
-		g_setting_freq_lock      = (Data[0] < 7) ? Data[0] : FREQ_LOCK_NORMAL;
-	#else
-		g_setting_freq_lock      = (Data[0] < 6) ? Data[0] : FREQ_LOCK_NORMAL;
-	#endif
+	g_setting_freq_lock          = (Data[0] < FREQ_LOCK_LAST) ? Data[0] : FREQ_LOCK_NORMAL;
 	g_setting_350_tx_enable      = (Data[1] < 2) ? Data[1] : false;  // was true
 	#ifdef ENABLE_KILL_REVIVE
 		g_setting_radio_disabled = (Data[2] < 2) ? Data[2] : false;
@@ -735,17 +733,24 @@ void BOARD_EEPROM_load(void)
 	g_setting_174_tx_enable      = (Data[3] < 2) ? Data[3] : false;
 	g_setting_470_tx_enable      = (Data[4] < 2) ? Data[4] : false;
 	g_setting_350_enable         = (Data[5] < 2) ? Data[5] : true;
-	g_setting_scramble_enable    = (Data[6] < 2) ? Data[6] : true;
+	g_setting_scramble_enable    = (Data[6] & (1u << 0)) ? true : false;
+	#ifdef ENABLE_RX_SIGNAL_BAR
+		g_setting_rssi_bar       = (Data[6] & (1u << 1)) ? true : false;
+	#endif
 	g_setting_tx_enable          = (Data[7] & (1u << 0)) ? true : false;
 	g_setting_live_dtmf_decoder  = (Data[7] & (1u << 1)) ? true : false;
 	g_setting_battery_text       = (((Data[7] >> 2) & 3u) <= 2) ? (Data[7] >> 2) & 3 : 2;
-	#ifdef ENABLE_AUDIO_BAR
+	#ifdef ENABLE_TX_AUDIO_BAR
 		g_setting_mic_bar        = (Data[7] & (1u << 4)) ? true : false;
 	#endif
 	#ifdef ENABLE_AM_FIX
 		g_setting_am_fix         = (Data[7] & (1u << 5)) ? true : false;
 	#endif
 	g_setting_backlight_on_tx_rx = (Data[7] >> 6) & 3u;
+
+	// 0F48..0F4F
+	EEPROM_ReadBuffer(0x0F48, Data, 8);
+	g_eeprom.scan_hold_time_500ms = (Data[0] > 20) ? 6 : (Data[0] < 2) ? 6 : Data[0];
 
 	if (!g_eeprom.vfo_open)
 	{

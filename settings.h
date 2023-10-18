@@ -38,9 +38,11 @@ enum {
 	FREQ_LOCK_GB,
 	FREQ_LOCK_430,
 	FREQ_LOCK_438,
+	FREQ_LOCK_446,
 #ifdef ENABLE_TX_UNLOCK
-	FREQ_LOCK_TX_UNLOCK
+	FREQ_LOCK_TX_UNLOCK,
 #endif
+	FREQ_LOCK_LAST
 };
 
 enum {
@@ -154,12 +156,12 @@ typedef struct {
 	uint8_t  frequency_reverse:1;    // reverse repeater
 	uint8_t  channel_bandwidth:1;    // wide/narrow
 	uint8_t  tx_power:2;             // 0, 1 or 2 .. L, M or H
-	uint8_t  busy_channel_lockout:1; //
+	uint8_t  busy_channel_lock:1;    //
 	#if 0
 		uint8_t unused5:3;           //
 	#else
 		uint8_t unused5:1;           //
-		uint8_t compander:2;         // 0 = off, 1 = TX, 2 = RX, 3 = TX/RX
+		uint8_t compand:2;           // 0 = off, 1 = TX, 2 = RX, 3 = TX/RX
 	#endif
 	// [13]
 	uint8_t  dtmf_decoding_enable:1; //
@@ -267,8 +269,7 @@ typedef struct {
 	// 0x0D60
 	struct {                                        // these channel attribute settings could have been in the t_channel structure !
 		uint8_t    band:4;                          // why do QS have these 4 bits ? .. band can/is computed from the frequency
-		uint8_t    unused:2;                        // 0's ?
-//		uint8_t    compander:2;                     // smoved this to the t_channel structure
+		uint8_t    unused:2;                        // 0's
 		uint8_t    scanlist2:1;                     // set if is in scan list 2
 		uint8_t    scanlist1:1;                     // set if is in scan list 1
 	} __attribute__((packed)) channel_attr[200];    //
@@ -291,7 +292,7 @@ typedef struct {
 	uint8_t        vox_switch;                      //
 	uint8_t        vox_level;                       //
 	uint8_t        mic_sensitivity;                 //
-	#if 1
+	#ifdef ENABLE_CONTRAST
 		uint8_t    lcd_contrast;                    // 1of11
 	#else
 		uint8_t    unused4;                         // 0xff's
@@ -386,12 +387,19 @@ typedef struct {
 
 	// 0x0F40
 	uint8_t        freq_lock;                       //
-	uint8_t        enable_tx_350;                   // 350MHz ~ 400MHz
-	uint8_t        radio_disabled;                  // 0 = not radio is not disabled
-	uint8_t        enable_tx_200;                   // 174MHz ~ 350MHz
-	uint8_t        enable_tx_470;                   // >= 470MHz disabled
-	uint8_t        enable_350;                      // 0 = 350HMz ~ 400MHz RX/TX disabled
-	uint8_t        enable_scrambler;                // 0 = scrambler disabled, 1 = enabled
+	uint8_t        enable_tx_350:1;                 // 1 = 350MHz ~ 400MHz TX is enabled
+	uint8_t        unused11a:7;                     //
+	uint8_t        radio_disabled:1;                // 1 = radio is disabled
+	uint8_t        unused11b:7;                     //
+	uint8_t        enable_tx_200:1;                 // 1 = 174MHz ~ 350MHz TX enabled
+	uint8_t        unused11c:7;                     //
+	uint8_t        enable_tx_470:1;                 // 1 = >= 470MHz TX enabled
+	uint8_t        unused11d:7;                     //
+	uint8_t        enable_350:1;                    // 1 = 350HMz ~ 400MHz enabled
+	uint8_t        unused11e:7;                     //
+	uint8_t        enable_scrambler:1;              //
+	uint8_t        enable_rssi_bar:1;               // 1of11
+	uint8_t        unused11f:6;                     //
 	#if 0
 		// QS
 		uint8_t    unused12[9];                     // 0xff's
@@ -404,7 +412,9 @@ typedef struct {
 		uint8_t    am_fix:1;              // 1 = RX AM fix
 		uint8_t    backlight_on_tx_rx:2;  // 0 = no backlight when TX/RX, 1 = when TX, 2 = when RX, 3 = both RX/TX
 
-		uint8_t    unused12[8];           // 0xff's
+		uint8_t    scan_hold_time;        // ticks we stay paused on a signal when scanning
+
+		uint8_t    unused12[7];           // 0xff's
 	#endif
 
 	// 0x0F50
@@ -525,6 +535,8 @@ typedef struct {
 	uint32_t              power_on_password;
 	uint16_t              vox1_threshold;
 	uint16_t              vox0_threshold;
+
+	uint8_t               scan_hold_time_500ms;
 
 //	uint8_t               field29_0x26;
 //	uint8_t               field30_0x27;

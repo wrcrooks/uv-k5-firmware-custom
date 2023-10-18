@@ -92,8 +92,8 @@ void Main(void)
 
 	BOARD_EEPROM_LoadCalibration();
 
-	RADIO_ConfigureChannel(0, VFO_CONFIGURE_RELOAD);
-	RADIO_ConfigureChannel(1, VFO_CONFIGURE_RELOAD);
+	RADIO_configure_channel(0, VFO_CONFIGURE_RELOAD);
+	RADIO_configure_channel(1, VFO_CONFIGURE_RELOAD);
 
 	RADIO_select_vfos();
 
@@ -104,8 +104,10 @@ void Main(void)
 
 	BATTERY_GetReadings(false);
 
-	ST7565_SetContrast(g_setting_contrast);
-
+	#ifdef ENABLE_CONTRAST
+		ST7565_SetContrast(g_setting_contrast);
+	#endif
+	
 	#ifdef ENABLE_AM_FIX
 		AM_fix_init();
 	#endif

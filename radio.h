@@ -26,7 +26,7 @@
 
 enum {
 	USER_CH_BAND_MASK = 0x0F << 0,
-	USER_CH_COMPAND   =   3u << 4,  // new
+	USER_CH_SPARE     =   3u << 4,
 	USER_CH_SCANLIST2 =   1u << 6,
 	USER_CH_SCANLIST1 =   1u << 7
 };
@@ -111,7 +111,7 @@ typedef struct vfo_info_t
 
 	uint8_t        am_mode;
 
-	uint8_t        compander;
+	uint8_t        compand;
 
 	char           name[16];
 } vfo_info_t;
@@ -129,11 +129,11 @@ extern vfo_state_t     g_vfo_state[2];
 bool     RADIO_CheckValidChannel(uint16_t ChNum, bool bCheckScanList, uint8_t RadioNum);
 uint8_t  RADIO_FindNextChannel(uint8_t ChNum, scan_state_dir_t Direction, bool bCheckScanList, uint8_t RadioNum);
 void     RADIO_InitInfo(vfo_info_t *pInfo, const uint8_t ChannelSave, const uint32_t Frequency);
-void     RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure);
+void     RADIO_configure_channel(const unsigned int VFO, const unsigned int configure);
 void     RADIO_ConfigureSquelchAndOutputPower(vfo_info_t *pInfo);
 void     RADIO_ApplyOffset(vfo_info_t *pInfo);
 void     RADIO_select_vfos(void);
-void     RADIO_setup_registers(bool switch_to_function_0);
+void     RADIO_setup_registers(bool switch_to_function_foreground);
 #ifdef ENABLE_NOAA
 	void RADIO_ConfigureNOAA(void);
 #endif
@@ -143,6 +143,6 @@ void     RADIO_Setg_vfo_state(vfo_state_t State);
 void     RADIO_PrepareTX(void);
 void     RADIO_EnableCxCSS(void);
 void     RADIO_PrepareCssTX(void);
-void     RADIO_SendEndOfTransmission(void);
+void     RADIO_tx_eot(void);
 
 #endif

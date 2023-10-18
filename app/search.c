@@ -334,8 +334,8 @@ static void SEARCH_Key_MENU(bool key_pressed, bool key_held)
 			}
 			else
 			{
-				RADIO_ConfigureChannel(0, VFO_CONFIGURE_RELOAD);
-				RADIO_ConfigureChannel(1, VFO_CONFIGURE_RELOAD);
+				RADIO_configure_channel(0, VFO_CONFIGURE_RELOAD);
+				RADIO_configure_channel(1, VFO_CONFIGURE_RELOAD);
 
 				g_tx_vfo->freq_config_rx.code_type = g_search_css_result_type;
 				g_tx_vfo->freq_config_rx.code      = g_search_css_result_code;
@@ -498,7 +498,8 @@ void SEARCH_Start(void)
 		g_search_frequency    = g_rx_vfo->p_rx->frequency;
 		g_search_step_setting = g_rx_vfo->step_setting;
 
-		BK4819_PickRXFilterPathBasedOnFrequency(g_search_frequency);
+		BK4819_set_rf_filter_path(g_search_frequency);
+
 		BK4819_SetScanFrequency(g_search_frequency);
 	}
 	else
@@ -506,7 +507,13 @@ void SEARCH_Start(void)
 		g_search_css_state = SEARCH_CSS_STATE_OFF;
 		g_search_frequency = 0xFFFFFFFF;
 
-		BK4819_PickRXFilterPathBasedOnFrequency(0xFFFFFFFF);
+#if 1
+		// this is why it needs such a strong signal
+		BK4819_set_rf_filter_path(0xFFFFFFFF);                 // disable the LNA filter paths
+#else
+		BK4819_set_rf_filter_path(g_rx_vfo->p_rx->frequency);  // lets have a play ;)
+#endif
+
 		BK4819_EnableFrequencyScan();
 	}
 

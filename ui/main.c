@@ -77,7 +77,7 @@ void draw_bar(uint8_t *line, const int len, const int max_width)
 	#endif
 }
 
-#ifdef ENABLE_SHOW_TX_TIMEOUT
+#ifdef ENABLE_TX_TIMEOUT_BAR
 	bool UI_DisplayTXCountdown(const bool now)
 	{
 		unsigned int timeout_secs = 0;
@@ -91,7 +91,7 @@ void draw_bar(uint8_t *line, const int len, const int max_width)
 		if (g_eeprom.tx_timeout_timer == 0)
 			timeout_secs = 30;   // 30 sec
 		else
-		if (g_eeprom.tx_timeout_timer < (ARRAY_SIZE(g_sub_menu_TOT) - 1))
+		if (g_eeprom.tx_timeout_timer < (ARRAY_SIZE(g_sub_MENU_TX_TO) - 1))
 			timeout_secs = 60 * g_eeprom.tx_timeout_timer;  // minutes
 		else
 			timeout_secs = 60 * 15;  // 15 minutes
@@ -152,7 +152,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 	#pragma GCC diagnostic pop
 }
 
-#ifdef ENABLE_AUDIO_BAR
+#ifdef ENABLE_TX_AUDIO_BAR
 
 	uint32_t sqrt16(uint32_t value)
 	{	// return square root of 'value'
@@ -233,85 +233,84 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 	}
 #endif
 
-#ifdef ENABLE_RSSI_BAR
-	void UI_DisplayRSSIBar(const int16_t rssi, const bool now)
+#ifdef ENABLE_RX_SIGNAL_BAR
+	bool UI_DisplayRSSIBar(const int16_t rssi, const bool now)
 	{
-//		const int16_t      s0_dBm       = -127;                  // S0 .. base level
-		const int16_t      s0_dBm       = -147;                  // S0 .. base level
-
-		const int16_t      s9_dBm       = s0_dBm + (6 * 9);      // S9 .. 6dB/S-Point
-		const int16_t      bar_max_dBm  = s9_dBm + 30;           // S9+30dB
-//		const int16_t      bar_min_dBm  = s0_dBm + (6 * 0);      // S0
-		const int16_t      bar_min_dBm  = s0_dBm + (6 * 4);      // S4
-
-		// ************
-
-		const unsigned int txt_width    = 7 * 8;                 // 8 text chars
-		const unsigned int bar_x        = 2 + txt_width + 4;     // X coord of bar graph
-		const unsigned int bar_width    = LCD_WIDTH - 1 - bar_x;
-
-		const int16_t      rssi_dBm     = (rssi / 2) - 160;
-		const int16_t      clamped_dBm  = (rssi_dBm <= bar_min_dBm) ? bar_min_dBm : (rssi_dBm >= bar_max_dBm) ? bar_max_dBm : rssi_dBm;
-		const unsigned int bar_range_dB = bar_max_dBm - bar_min_dBm;
-		const unsigned int len          = ((clamped_dBm - bar_min_dBm) * bar_width) / bar_range_dB;
-
-		const unsigned int line         = 3;
-		uint8_t           *p_line        = g_frame_buffer[line];
-
-		char               s[16];
-
-		if (g_eeprom.key_lock && g_keypad_locked > 0)
-			return;     // display is in use
-
-		if (g_current_function == FUNCTION_TRANSMIT ||
-		    g_screen_to_display != DISPLAY_MAIN ||
-			g_dtmf_call_state != DTMF_CALL_STATE_NONE)
-			return;     // display is in use
-
-		if (now)
-			memset(p_line, 0, LCD_WIDTH);
-
-		if (rssi_dBm >= (s9_dBm + 6))
-		{	// S9+XXdB, 1dB increment
-			const char *fmt[] = {"%3d 9+%u  ", "%3d 9+%2u "};
-			const unsigned int s9_dB = ((rssi_dBm - s9_dBm) <= 99) ? rssi_dBm - s9_dBm : 99;
-			sprintf(s, (s9_dB < 10) ? fmt[0] : fmt[1], rssi_dBm, s9_dB);
+		if (g_setting_rssi_bar)
+		{
+//			const int16_t      s0_dBm       = -127;                  // S0 .. base level
+			const int16_t      s0_dBm       = -147;                  // S0 .. base level
+	
+			const int16_t      s9_dBm       = s0_dBm + (6 * 9);      // S9 .. 6dB/S-Point
+			const int16_t      bar_max_dBm  = s9_dBm + 30;           // S9+30dB
+//			const int16_t      bar_min_dBm  = s0_dBm + (6 * 0);      // S0
+			const int16_t      bar_min_dBm  = s0_dBm + (6 * 4);      // S4
+	
+			// ************
+	
+			const unsigned int txt_width    = 7 * 8;                 // 8 text chars
+			const unsigned int bar_x        = 2 + txt_width + 4;     // X coord of bar graph
+			const unsigned int bar_width    = LCD_WIDTH - 1 - bar_x;
+	
+			const int16_t      rssi_dBm     = (rssi / 2) - 160;
+			const int16_t      clamped_dBm  = (rssi_dBm <= bar_min_dBm) ? bar_min_dBm : (rssi_dBm >= bar_max_dBm) ? bar_max_dBm : rssi_dBm;
+			const unsigned int bar_range_dB = bar_max_dBm - bar_min_dBm;
+			const unsigned int len          = ((clamped_dBm - bar_min_dBm) * bar_width) / bar_range_dB;
+	
+			const unsigned int line         = 3;
+			uint8_t           *p_line        = g_frame_buffer[line];
+	
+			char               s[16];
+	
+			if (g_eeprom.key_lock && g_keypad_locked > 0)
+				return false;     // display is in use
+	
+			if (g_current_function == FUNCTION_TRANSMIT ||
+				g_screen_to_display != DISPLAY_MAIN ||
+				g_dtmf_call_state != DTMF_CALL_STATE_NONE)
+				return false;     // display is in use
+	
+			if (now)
+				memset(p_line, 0, LCD_WIDTH);
+	
+			if (rssi_dBm >= (s9_dBm + 6))
+			{	// S9+XXdB, 1dB increment
+				const char *fmt[] = {"%3d 9+%u  ", "%3d 9+%2u "};
+				const unsigned int s9_dB = ((rssi_dBm - s9_dBm) <= 99) ? rssi_dBm - s9_dBm : 99;
+				sprintf(s, (s9_dB < 10) ? fmt[0] : fmt[1], rssi_dBm, s9_dB);
+			}
+			else
+			{	// S0 ~ S9, 6dB per S-point
+				const unsigned int s_level = (rssi_dBm >= s0_dBm) ? (rssi_dBm - s0_dBm) / 6 : 0;
+				sprintf(s, "%4d S%u ", rssi_dBm, s_level);
+			}
+			UI_PrintStringSmall(s, 2, 0, line);
+	
+			draw_bar(p_line + bar_x, len, bar_width);
+	
+			if (now)
+				ST7565_BlitFullScreen();
+			
+			return true;
 		}
-		else
-		{	// S0 ~ S9, 6dB per S-point
-			const unsigned int s_level = (rssi_dBm >= s0_dBm) ? (rssi_dBm - s0_dBm) / 6 : 0;
-			sprintf(s, "%4d S%u ", rssi_dBm, s_level);
-		}
-		UI_PrintStringSmall(s, 2, 0, line);
 
-		draw_bar(p_line + bar_x, len, bar_width);
-
-		if (now)
-			ST7565_BlitFullScreen();
+		return false;
 	}
 #endif
 
 void UI_update_rssi(const int16_t rssi, const int vfo)
 {
-	#ifdef ENABLE_RSSI_BAR
-
-		(void)vfo;  // unused
-
-		// optional larger RSSI dBm, S-point and bar level
-
-		if (center_line != CENTER_LINE_RSSI)
-			return;
-
-		if (g_current_function == FUNCTION_RECEIVE ||
-		    g_current_function == FUNCTION_MONITOR ||
-		    g_current_function == FUNCTION_INCOMING)
+#ifdef ENABLE_RX_SIGNAL_BAR
+	if (center_line == CENTER_LINE_RSSI)
+	{	// optional larger RSSI dBm, S-point and bar level
+		if (g_current_function == FUNCTION_RECEIVE || g_current_function == FUNCTION_MONITOR)
 		{
 			UI_DisplayRSSIBar(rssi, true);
 		}
+	}
+#endif
 
-	#else
-
-		// original little RS bars
+	{	// original little RS bars
 
 //		const int16_t dBm        = (rssi / 2) - 160;
 		const uint8_t Line       = (vfo == 0) ? 3 : 7;
@@ -389,7 +388,7 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 			UI_drawBars(p_line, rssi_level);
 
 		ST7565_DrawLine(0, Line, 23, p_line);
-	#endif
+	}
 }
 
 // ***************************************************************************
@@ -652,7 +651,7 @@ void UI_DisplayMain(void)
 				if (attributes & USER_CH_SCANLIST2)
 					memmove(p_line0 + 120, BITMAP_SCANLIST2, sizeof(BITMAP_SCANLIST2));
 				#ifndef ENABLE_BIG_FREQ
-					if ((attributes & USER_CH_COMPAND) > 0)
+					if (g_eeprom.vfo_info[vfo_num].compand)
 						memmove(p_line0 + 120 + LCD_WIDTH, BITMAP_COMPAND, sizeof(BITMAP_COMPAND));
 				#else
 
@@ -730,8 +729,8 @@ void UI_DisplayMain(void)
 				#endif
 
 				// show the channel symbols
-				const uint8_t attributes = g_user_channel_attributes[g_eeprom.screen_channel[vfo_num]];
-				if ((attributes & USER_CH_COMPAND) > 0)
+				//const uint8_t attributes = g_user_channel_attributes[g_eeprom.screen_channel[vfo_num]];
+				if (g_eeprom.vfo_info[vfo_num].compand)
 					#ifdef ENABLE_BIG_FREQ
 						memmove(p_line0 + 120, BITMAP_COMPAND, sizeof(BITMAP_COMPAND));
 					#else
@@ -757,7 +756,7 @@ void UI_DisplayMain(void)
 			else
 			if (mode == 2)
 			{	// RX signal level
-				//#ifndef ENABLE_RSSI_BAR
+				//#ifndef ENABLE_RX_SIGNAL_BAR
 					// antenna bar graph
 					if (g_vfo_rssi_bar_level[vfo_num] > 0)
 						Level = g_vfo_rssi_bar_level[vfo_num];
@@ -837,7 +836,7 @@ void UI_DisplayMain(void)
 		                 g_current_function == FUNCTION_MONITOR ||
 		                 g_current_function == FUNCTION_INCOMING);
 
-		#ifdef ENABLE_SHOW_TX_TIMEOUT
+		#ifdef ENABLE_TX_TIMEOUT_BAR
 			// show the TX timeout count down
 			if (UI_DisplayTXCountdown(false))
 			{
@@ -846,7 +845,7 @@ void UI_DisplayMain(void)
 			else
 		#endif
 
-		#ifdef ENABLE_AUDIO_BAR
+		#ifdef ENABLE_TX_AUDIO_BAR
 			// show the TX audio level
 			if (UI_DisplayAudioBar(false))
 			{
@@ -869,9 +868,9 @@ void UI_DisplayMain(void)
 			else
 		#endif
 
-		#ifdef ENABLE_RSSI_BAR
+		#ifdef ENABLE_RX_SIGNAL_BAR
 			// show the RX RSSI dBm, S-point and signal strength bar graph
-			if (rx)
+			if (rx && g_setting_rssi_bar)
 			{
 				center_line = CENTER_LINE_RSSI;
 				UI_DisplayRSSIBar(g_current_rssi[g_eeprom.rx_vfo], false);

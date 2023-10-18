@@ -16,6 +16,7 @@
 
 #include <string.h>
 
+#include "app/app.h"
 #include "app/dtmf.h"
 #ifdef ENABLE_FMRADIO
 	#include "app/fm.h"
@@ -128,9 +129,9 @@ void RADIO_InitInfo(vfo_info_t *pInfo, const uint8_t ChannelSave, const uint32_t
 	pInfo->output_power             = OUTPUT_POWER_LOW;
 	pInfo->freq_config_rx.frequency = Frequency;
 	pInfo->freq_config_tx.frequency = Frequency;
-	pInfo->p_rx                      = &pInfo->freq_config_rx;
-	pInfo->p_tx                      = &pInfo->freq_config_tx;
-	pInfo->compander                = 0;  // off
+	pInfo->p_rx                     = &pInfo->freq_config_rx;
+	pInfo->p_tx                     = &pInfo->freq_config_tx;
+	pInfo->compand                  = 0;  // off
 
 	if (ChannelSave == (FREQ_CHANNEL_FIRST + BAND2_108MHz))
 		pInfo->am_mode = 1;
@@ -138,7 +139,7 @@ void RADIO_InitInfo(vfo_info_t *pInfo, const uint8_t ChannelSave, const uint32_t
 	RADIO_ConfigureSquelchAndOutputPower(pInfo);
 }
 
-void RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure)
+void RADIO_configure_channel(const unsigned int VFO, const unsigned int configure)
 {
 	uint8_t     Channel;
 	uint8_t     Attributes;
@@ -265,7 +266,7 @@ void RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure
 		g_eeprom.vfo_info[VFO].step_freq     = STEP_FREQ_TABLE[Tmp];
 
 		Tmp = Data[7];
-		if (Tmp > (ARRAY_SIZE(g_sub_menu_SCRAMBLER) - 1))
+		if (Tmp > (ARRAY_SIZE(g_sub_MENU_SCRAMBLERAMBLER) - 1))
 			Tmp = 0;
 		g_eeprom.vfo_info[VFO].scrambling_type = Tmp;
 
@@ -319,6 +320,7 @@ void RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure
 			g_eeprom.vfo_info[VFO].channel_bandwidth = BK4819_FILTER_BW_WIDE;
 			g_eeprom.vfo_info[VFO].output_power      = OUTPUT_POWER_LOW;
 			g_eeprom.vfo_info[VFO].busy_channel_lock = false;
+			g_eeprom.vfo_info[VFO].compand           = 0;
 		}
 		else
 		{
@@ -327,6 +329,7 @@ void RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure
 			g_eeprom.vfo_info[VFO].channel_bandwidth = ((d4 >> 1) & 1u) ? true : false;
 			g_eeprom.vfo_info[VFO].output_power      =  (d4 >> 2) & 3u;
 			g_eeprom.vfo_info[VFO].busy_channel_lock = ((d4 >> 4) & 1u) ? true : false;
+			g_eeprom.vfo_info[VFO].compand           =  (d4 >> 6) & 3u;
 		}
 
 		if (Data[5] == 0xFF)
@@ -417,8 +420,6 @@ void RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure
 		g_eeprom.vfo_info[VFO].freq_config_rx.code_type = CODE_TYPE_NONE;
 		g_eeprom.vfo_info[VFO].freq_config_tx.code_type = CODE_TYPE_NONE;
 	}
-
-	g_eeprom.vfo_info[VFO].compander = (Attributes & USER_CH_COMPAND) >> 4;
 
 	RADIO_ConfigureSquelchAndOutputPower(pRadio);
 }
@@ -551,7 +552,7 @@ void RADIO_ConfigureSquelchAndOutputPower(vfo_info_t *pInfo)
 
 	EEPROM_ReadBuffer(0x1ED0 + (Band * 16) + (pInfo->output_power * 3), TX_power, 3);
 
-	#ifdef ENABLE_LOWER_LOW_MID_TX
+	#ifdef ENABLE_REDUCE_LOW_MID_TX_POWER
 		// make low and mid even lower
 		if (pInfo->output_power == OUTPUT_POWER_LOW)
 		{
@@ -621,17 +622,16 @@ void RADIO_select_vfos(void)
 	RADIO_SelectCurrentVfo();
 }
 
-void RADIO_setup_registers(bool switch_to_function_0)
+void RADIO_setup_registers(bool switch_to_function_foreground)
 {
 	BK4819_filter_bandwidth_t Bandwidth = g_rx_vfo->channel_bandwidth;
 	uint16_t                  interrupt_mask;
 	uint32_t                  Frequency;
 
-	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
-
+	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 	g_enable_speaker = false;
 
-	BK4819_set_GPIO_pin(BK4819_GPIO0_PIN28_GREEN, false);
+	BK4819_set_GPIO_pin(BK4819_GPIO6_PIN2_GREEN, false);
 
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wimplicit-fallthrough="
@@ -653,9 +653,9 @@ void RADIO_setup_registers(bool switch_to_function_0)
 
 	#pragma GCC diagnostic pop
 
-	BK4819_set_GPIO_pin(BK4819_GPIO1_PIN29_RED, false);   // LED off
+	BK4819_set_GPIO_pin(BK4819_GPIO5_PIN1_RED, false);         // LED off
 	BK4819_SetupPowerAmplifier(0, 0);
-	BK4819_set_GPIO_pin(BK4819_GPIO5_PIN1_UNKNOWN, false);        // ???
+	BK4819_set_GPIO_pin(BK4819_GPIO1_PIN29_PA_ENABLE, false);  // PA off
 
 	while (1)
 	{	// wait for the interrupt to clear ?
@@ -677,17 +677,16 @@ void RADIO_setup_registers(bool switch_to_function_0)
 		else
 	#endif
 			Frequency = g_rx_vfo->p_rx->frequency;
+
 	BK4819_set_rf_frequency(Frequency, false);
+	BK4819_set_rf_filter_path(Frequency);
 
 	BK4819_SetupSquelch(
 		g_rx_vfo->squelch_open_rssi_thresh,    g_rx_vfo->squelch_close_rssi_thresh,
 		g_rx_vfo->squelch_open_noise_thresh,   g_rx_vfo->squelch_close_noise_thresh,
 		g_rx_vfo->squelch_close_glitch_thresh, g_rx_vfo->squelch_open_glitch_thresh);
 
-	BK4819_PickRXFilterPathBasedOnFrequency(Frequency);
-
-	// what does this in do ?
-	BK4819_set_GPIO_pin(BK4819_GPIO6_PIN2_UNKNOWN, true);
+	BK4819_set_GPIO_pin(BK4819_GPIO0_PIN28_RX_ENABLE, true);
 
 	// AF RX Gain and DAC
 	BK4819_WriteRegister(BK4819_REG_48, 0xB3A8);  // 1011 00 111010 1000
@@ -788,7 +787,7 @@ void RADIO_setup_registers(bool switch_to_function_0)
 			BK4819_DisableVox();
 
 	// RX expander
-	BK4819_SetCompander((g_rx_vfo->am_mode == 0 && g_rx_vfo->compander >= 2) ? g_rx_vfo->compander : 0);
+	BK4819_SetCompander((g_rx_vfo->am_mode == 0 && g_rx_vfo->compand >= 2) ? g_rx_vfo->compand : 0);
 
 	#if 0
 		#ifdef ENABLE_KILL_REVIVE
@@ -822,8 +821,13 @@ void RADIO_setup_registers(bool switch_to_function_0)
 
 	FUNCTION_Init();
 
-	if (switch_to_function_0)
-		FUNCTION_Select(FUNCTION_FOREGROUND);
+	if (switch_to_function_foreground)
+	{
+		if (g_monitor_enabled)
+			APP_start_listening(FUNCTION_MONITOR, false);
+		else
+			FUNCTION_Select(FUNCTION_FOREGROUND);
+	}
 }
 
 #ifdef ENABLE_NOAA
@@ -875,11 +879,11 @@ void RADIO_enableTX(const bool fsk_tx)
 {
 	BK4819_filter_bandwidth_t Bandwidth = g_current_vfo->channel_bandwidth;
 
-	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
+	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 
 	g_enable_speaker = false;
 
-	BK4819_set_GPIO_pin(BK4819_GPIO6_PIN2_UNKNOWN, false);     // ???
+	BK4819_set_GPIO_pin(BK4819_GPIO0_PIN28_RX_ENABLE, false);     // ???
 
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wimplicit-fallthrough="
@@ -901,16 +905,23 @@ void RADIO_enableTX(const bool fsk_tx)
 
 	#pragma GCC diagnostic pop
 
+	// if DTMF is enabled when TX'ing, it changes the TX audio filtering ! .. 1of11
+	// so MAKE SURE that DTMF is disabled - until needed
+	BK4819_DisableDTMF();
+	
+	BK4819_SetCompander((!fsk_tx && g_rx_vfo->am_mode == 0 && (g_rx_vfo->compand == 1 || g_rx_vfo->compand >= 3)) ? g_rx_vfo->compand : 0);
+
 	BK4819_set_rf_frequency(g_current_vfo->p_tx->frequency, false);
-	BK4819_SetCompander((!fsk_tx && g_rx_vfo->am_mode == 0 && (g_rx_vfo->compander == 1 || g_rx_vfo->compander >= 3)) ? g_rx_vfo->compander : 0);
+	BK4819_set_rf_filter_path(g_current_vfo->p_tx->frequency);
+
 	BK4819_PrepareTransmit();
-	BK4819_PickRXFilterPathBasedOnFrequency(g_current_vfo->p_tx->frequency);
-	BK4819_set_GPIO_pin(BK4819_GPIO5_PIN1_UNKNOWN, true);                       // ???
+	BK4819_set_GPIO_pin(BK4819_GPIO1_PIN29_PA_ENABLE, true);                // PA on
 	if (g_screen_to_display != DISPLAY_AIRCOPY)
 		BK4819_SetupPowerAmplifier(g_current_vfo->txp_calculated_setting, g_current_vfo->p_tx->frequency);
 	else
-		BK4819_SetupPowerAmplifier(0, g_current_vfo->p_tx->frequency);  // very low power when in AIRCOPY mode
-	BK4819_set_GPIO_pin(BK4819_GPIO1_PIN29_RED, true);                  // turn the RED LED on
+		BK4819_SetupPowerAmplifier(0, g_current_vfo->p_tx->frequency);      // very low power when in AIRCOPY mode
+
+	BK4819_set_GPIO_pin(BK4819_GPIO5_PIN1_RED, true);                       // turn the RED LED on
 
 	if (fsk_tx)
 	{
@@ -975,10 +986,6 @@ void RADIO_PrepareTX(void)
 
 	if (g_eeprom.dual_watch != DUAL_WATCH_OFF)
 	{	// dual-RX is enabled
-
-		g_dual_watch_count_down_10ms = dual_watch_count_after_tx_10ms;
-		g_schedule_dual_watch        = false;
-
 #if 0
 		if (g_rx_vfo_is_active)
 		{	// use the TX vfo
@@ -1071,7 +1078,7 @@ void RADIO_PrepareTX(void)
 		if (g_eeprom.tx_timeout_timer == 0)
 			g_tx_timer_count_down_500ms = 60;   // 30 sec
 		else
-		if (g_eeprom.tx_timeout_timer < (ARRAY_SIZE(g_sub_menu_TOT) - 1))
+		if (g_eeprom.tx_timeout_timer < (ARRAY_SIZE(g_sub_MENU_TX_TO) - 1))
 			g_tx_timer_count_down_500ms = 120 * g_eeprom.tx_timeout_timer;  // minutes
 		else
 			g_tx_timer_count_down_500ms = 120 * 15;  // 15 minutes
@@ -1114,29 +1121,27 @@ void RADIO_PrepareCssTX(void)
 	RADIO_setup_registers(true);
 }
 
-void RADIO_SendEndOfTransmission(void)
+void RADIO_tx_eot(void)
 {
-	if (g_eeprom.roger_mode == ROGER_MODE_ROGER)
-		BK4819_PlayRoger();
-	else
-	if (g_eeprom.roger_mode == ROGER_MODE_MDC)
-		BK4819_PlayRogerMDC1200();
-
-	if (g_current_vfo->dtmf_ptt_id_tx_mode == PTT_ID_APOLLO)
-		BK4819_PlaySingleTone(APOLLO_TONE2_HZ, APOLLO_TONE_MS, 28, g_eeprom.dtmf_side_tone);
+	#if defined(ENABLE_ALARM) || defined(ENABLE_TX1750)
+		if (g_alarm_state != ALARM_STATE_OFF)
+		{	// don't send EOT if TX'ing tone/alarm
+			BK4819_ExitDTMF_TX(true);
+			return;
+		} 
+	#endif
 
 	if (g_dtmf_call_state == DTMF_CALL_STATE_NONE &&
 	   (g_current_vfo->dtmf_ptt_id_tx_mode == PTT_ID_TX_DOWN || g_current_vfo->dtmf_ptt_id_tx_mode == PTT_ID_BOTH))
 	{	// end-of-tx
 		if (g_eeprom.dtmf_side_tone)
 		{
-			GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
+			GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 			g_enable_speaker = true;
-			SYSTEM_DelayMs(60);
+//			SYSTEM_DelayMs(60);
+			SYSTEM_DelayMs(5);
 		}
-
 		BK4819_EnterDTMF_TX(g_eeprom.dtmf_side_tone);
-
 		BK4819_PlayDTMFString(
 				g_eeprom.dtmf_key_down_code,
 				0,
@@ -1145,9 +1150,18 @@ void RADIO_SendEndOfTransmission(void)
 				g_eeprom.dtmf_code_persist_time,
 				g_eeprom.dtmf_code_interval_time);
 
-		GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
+		GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 		g_enable_speaker = false;
 	}
+	else
+	if (g_eeprom.roger_mode == ROGER_MODE_ROGER)
+		BK4819_PlayRoger();
+	else
+	if (g_eeprom.roger_mode == ROGER_MODE_MDC)
+		BK4819_PlayRogerMDC1200();
+	else
+	if (g_current_vfo->dtmf_ptt_id_tx_mode == PTT_ID_APOLLO)
+		BK4819_PlayTone(APOLLO_TONE2_HZ, APOLLO_TONE_MS, 28);
 
 	BK4819_ExitDTMF_TX(true);
 }
