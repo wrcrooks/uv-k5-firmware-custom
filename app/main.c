@@ -24,6 +24,9 @@
 #include "app/generic.h"
 #include "app/main.h"
 #include "app/search.h"
+#ifdef ENABLE_SPECTRUM
+//	#include "app/spectrum.h"
+#endif
 #include "audio.h"
 #include "board.h"
 #include "driver/bk4819.h"
@@ -35,9 +38,7 @@
 #include "settings.h"
 #include "ui/inputbox.h"
 #include "ui/ui.h"
-#ifdef ENABLE_SPECTRUM
-//	#include "app/spectrum.h"
-#endif
+#include "ui/menu.h"
 
 void toggle_chan_scanlist(void)
 {	// toggle the selected channels scanlist setting
@@ -247,7 +248,7 @@ void processFKeyFunction(const key_code_t Key)
 
 		case KEY_6:    // H/M/L
 
-			if (g_scan_state_dir == SCAN_STATE_DIR_OFF)
+			if (g_scan_state_dir != SCAN_STATE_DIR_OFF)
 			{
 				g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
 				return;
@@ -473,8 +474,11 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 			}
 
 			g_tx_vfo->freq_config_rx.frequency = Frequency;
+			// 1of11 .. test to prevent the monitor being turned off
+//			g_request_save_channel = 1;
+			SETTINGS_SaveChannel(g_tx_vfo->channel_save, g_eeprom.tx_vfo, g_tx_vfo, 1);
+			RADIO_setup_registers(true);
 
-			g_request_save_channel = 1;
 			return;
 		}
 
@@ -587,7 +591,7 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 {
 	if (key_pressed && !key_held)
 	{	// key just pressed
-		g_beep_to_play = BEEP_1KHZ_60MS_OPTIONAL;
+		AUDIO_PlayBeep(BEEP_1KHZ_60MS_OPTIONAL);
 	}
 	
 	if (key_held)
@@ -609,22 +613,16 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 				g_fkey_pressed  = false;
 				g_update_status = true;
 
-				#ifdef ENABLE_COPY_CHAN_TO_VFO
+				#ifdef ENABLE_COPY_CHAN_TO_VFO_TO_CHAN
 
-					if (g_eeprom.vfo_open && g_css_scan_mode == CSS_SCAN_MODE_OFF)
-					{
-
-						if (g_scan_state_dir != SCAN_STATE_DIR_OFF)
-						{
-							if (g_current_function != FUNCTION_INCOMING ||
-							    g_rx_reception_mode == RX_MODE_NONE ||
-								g_scan_pause_10ms == 0)
-							{	// scan is running (not paused)
-								return;
-							}
-						}
-
-						const unsigned int vfo = get_RX_VFO();
+					if (g_scan_state_dir == SCAN_STATE_DIR_OFF &&
+					    g_css_scan_mode == CSS_SCAN_MODE_OFF   &&
+					    g_eeprom.dual_watch == DUAL_WATCH_OFF  &&
+					    g_eeprom.vfo_open)
+					{	// not scanning
+				
+						//const unsigned int vfo = get_RX_VFO();
+						const unsigned int vfo = g_eeprom.tx_vfo;
 
 						if (IS_USER_CHANNEL(g_eeprom.screen_channel[vfo]))
 						{	// copy channel to VFO, then swap to the VFO
@@ -642,10 +640,40 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 
 							g_request_save_vfo = true;
 
-							g_beep_to_play = BEEP_1KHZ_60MS_OPTIONAL;
+							g_beep_to_play = BEEP_880HZ_60MS_TRIPLE_BEEP;
+							//g_beep_to_play = BEEP_1KHZ_60MS_OPTIONAL;
 
 							g_update_status  = true;
 							g_update_display = true;
+						}
+						else
+						if (IS_FREQ_CHANNEL(g_eeprom.screen_channel[vfo]))
+						{	// copy VFO to channel
+
+							// search the channels to see if the frequency is already present
+							const unsigned int chan = BOARD_find_channel(g_eeprom.vfo_info[vfo].p_tx->frequency);
+
+							g_screen_to_display = DISPLAY_INVALID;
+							GUI_SelectNextDisplay(DISPLAY_MENU);
+	
+							g_flag_refresh_menu = false;
+							g_menu_cursor       = MENU_MEM_SAVE;
+							g_is_in_sub_menu    = true;
+
+							if (chan <= USER_CHANNEL_LAST)
+							{	// go straight to the channel that holds the same frequency
+								g_sub_menu_selection = chan;
+							}
+
+							g_screen_to_display = DISPLAY_MENU;
+							g_update_display    = false;
+							UI_DisplayMenu();
+
+							#ifdef ENABLE_VOICE
+								g_another_voice_id = VOICE_ID_MENU;
+							#endif
+
+							g_beep_to_play = BEEP_880HZ_60MS_TRIPLE_BEEP;
 						}
 					}
 					else
@@ -671,6 +699,7 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 		{
 			g_flag_refresh_menu = true;
 			g_request_display_screen = DISPLAY_MENU;
+
 			#ifdef ENABLE_VOICE
 				g_another_voice_id   = VOICE_ID_MENU;
 			#endif
@@ -781,7 +810,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 		#endif
 
 		// only update eeprom when the key is released - saves a LOT of wear and tear on the little eeprom
-		g_flag_save_channel = 1;
+		SETTINGS_SaveChannel(g_tx_vfo->channel_save, g_eeprom.tx_vfo, g_tx_vfo, 1);
 
 		#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
 //			UART_printf("save chan\r\n");
@@ -850,7 +879,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 					g_request_save_channel = 1;
 				}
 				else
-				{	// don't need to go through all the other stuff .. lets speed things up !!
+				{	// don't need to go through all the other stuff .. lets speed things up !
 
 					#ifdef ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS
 						if (!key_held && key_pressed)

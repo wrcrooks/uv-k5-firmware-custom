@@ -8,7 +8,7 @@ ENABLE_SWD                       := 1
 ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 0
+ENABLE_UART_DEBUG                := 1
 ENABLE_AIRCOPY                   := 1
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1
 ENABLE_AIRCOPY_RX_REBOOT         := 0
@@ -46,7 +46,7 @@ ENABLE_FASTER_CHANNEL_SCAN       := 1
 ENABLE_RX_SIGNAL_BAR             := 1
 ENABLE_TX_TIMEOUT_BAR            := 0
 ENABLE_TX_AUDIO_BAR              := 1
-ENABLE_COPY_CHAN_TO_VFO          := 1
+ENABLE_COPY_CHAN_TO_VFO_TO_CHAN  := 1
 #ENABLE_PANADAPTER               := 0
 #ENABLE_SINGLE_VFO_CHAN          := 0
 
@@ -369,8 +369,8 @@ endif
 ifeq ($(ENABLE_TX_TIMEOUT_BAR),1)
 	CFLAGS  += -DENABLE_TX_TIMEOUT_BAR
 endif
-ifeq ($(ENABLE_COPY_CHAN_TO_VFO),1)
-	CFLAGS  += -DENABLE_COPY_CHAN_TO_VFO
+ifeq ($(ENABLE_COPY_CHAN_TO_VFO_TO_CHAN),1)
+	CFLAGS  += -DENABLE_COPY_CHAN_TO_VFO_TO_CHAN
 endif
 ifeq ($(ENABLE_SINGLE_VFO_CHAN),1)
 	CFLAGS  += -DENABLE_SINGLE_VFO_CHAN

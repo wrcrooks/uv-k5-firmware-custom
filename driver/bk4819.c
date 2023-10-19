@@ -753,7 +753,8 @@ void BK4819_set_rf_frequency(const uint32_t frequency, const bool trigger_update
 		// trigger a PLL/VCO update
 		//
 		const uint16_t reg = BK4819_ReadRegister(BK4819_REG_30);
-		BK4819_WriteRegister(BK4819_REG_30, reg & ~(1u << 15) & (15u << 4));
+//		BK4819_WriteRegister(BK4819_REG_30, reg & ~(1u << 15) & (15u << 4));
+		BK4819_WriteRegister(BK4819_REG_30, 0x0200);
 		BK4819_WriteRegister(BK4819_REG_30, reg);
 	}
 }
@@ -1034,31 +1035,32 @@ void BK4819_StartTone1(const uint16_t frequency, const unsigned int level, const
 
 	BK4819_EnterTxMute();
 
-//	SYSTEM_DelayMs(2);
-	GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);	// enable speaker
-	SYSTEM_DelayMs(2);
+	BK4819_WriteRegister(BK4819_REG_70, BK4819_REG_70_ENABLE_TONE1 | ((level & 0x7f) << BK4819_REG_70_SHIFT_TONE1_TUNING_GAIN));
 
 	if (set_dac)
 	{
-		//BK4819_WriteRegister(BK4819_REG_30, 0);
+		BK4819_WriteRegister(BK4819_REG_30, 0);
 		//BK4819_WriteRegister(BK4819_REG_30, BK4819_REG_30_ENABLE_AF_DAC | BK4819_REG_30_ENABLE_DISC_MODE | BK4819_REG_30_ENABLE_TX_DSP);
 		BK4819_EnableTXLink();
 	}
 
-	BK4819_WriteRegister(BK4819_REG_70, BK4819_REG_70_ENABLE_TONE1 | ((level & 0x7f) << BK4819_REG_70_SHIFT_TONE1_TUNING_GAIN));
 	BK4819_WriteRegister(BK4819_REG_71, scale_freq(frequency));
 	BK4819_ExitTxMute();
+	
+//	SYSTEM_DelayMs(2);
+	GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);	// enable speaker
+	SYSTEM_DelayMs(2);
 }
 
 void BK4819_StopTones(void)
 {
+//	if (!g_enable_speaker)
+		GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
+
 	BK4819_EnterTxMute();
 	BK4819_WriteRegister(BK4819_REG_70, 0);
 	BK4819_WriteRegister(BK4819_REG_30, 0xC1FE);  // 1100 0001 1111 1110
 	BK4819_ExitTxMute();
-
-//	if (!g_enable_speaker)
-//		GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 }
 
 void BK4819_PlayTone(const unsigned int tone_Hz, const unsigned int delay, const unsigned int level)
