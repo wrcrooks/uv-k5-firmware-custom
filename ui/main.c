@@ -31,6 +31,7 @@
 #include "driver/bk4819.h"
 #include "driver/st7565.h"
 #include "external/printf/printf.h"
+#include "font.h"
 #include "functions.h"
 #include "helper/battery.h"
 #include "misc.h"
@@ -262,8 +263,10 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 
 			char               s[16];
 
+			#ifdef ENABLE_KEYLOCK
 			if (g_eeprom.key_lock && g_keypad_locked > 0)
 				return false;     // display is in use
+			#endif
 
 			if (g_current_function == FUNCTION_TRANSMIT ||
 				g_screen_to_display != DISPLAY_MAIN ||
@@ -370,8 +373,10 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 
 		// **********************************************************
 
+		#ifdef ENABLE_KEYLOCK
 		if (g_eeprom.key_lock && g_keypad_locked > 0)
 			return;    // display is in use
+		#endif
 
 		if (g_current_function == FUNCTION_TRANSMIT || g_screen_to_display != DISPLAY_MAIN)
 			return;    // display is in use
@@ -395,6 +400,7 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 
 void UI_DisplayMain(void)
 {
+	const unsigned int smallest_char_spacing = ARRAY_SIZE(g_font3x5[0]) + 1;
 	const unsigned int line0 = 0;  // text screen line
 	const unsigned int line1 = 4;
 	char               String[17];
@@ -420,6 +426,7 @@ void UI_DisplayMain(void)
 		return;
 	}
 
+	#ifdef ENABLE_KEYLOCK
 	if (g_eeprom.key_lock && g_keypad_locked > 0)
 	{	// tell user how to unlock the keyboard
 		backlight_turn_on(10);     // 5 seconds
@@ -428,6 +435,7 @@ void UI_DisplayMain(void)
 		ST7565_BlitFullScreen();
 		return;
 	}
+	#endif
 
 	for (vfo_num = 0; vfo_num < 2; vfo_num++)
 	{
@@ -746,19 +754,22 @@ void UI_DisplayMain(void)
 
 			#else
 			{
-				unsigned int x = LCD_WIDTH + LCD_WIDTH - 1 - sizeof(BITMAP_FREQ_CHAN) - sizeof(BITMAP_COMPAND);
-
-				if (g_eeprom.vfo_info[vfo_num].compand)
-					memmove(p_line0 + x, BITMAP_COMPAND, sizeof(BITMAP_COMPAND));
-				x += sizeof(BITMAP_COMPAND);
+				unsigned int x = LCD_WIDTH + LCD_WIDTH - 1 - (smallest_char_spacing * 1) - (smallest_char_spacing * 4);
 
 				if (IS_FREQ_CHANNEL(g_eeprom.screen_channel[vfo_num]))
 				{
 					//g_eeprom.vfo_info[vfo_num].frequency_channel = BOARD_find_channel(frequency);
 					if (g_eeprom.vfo_info[vfo_num].frequency_channel <= USER_CHANNEL_LAST)
-						memmove(p_line0 + x, BITMAP_FREQ_CHAN, sizeof(BITMAP_FREQ_CHAN));
-					//x += sizeof(BITMAP_FREQ_CHAN);
+					{	// the channel number that contains this VFO frequency
+						sprintf(String, "%03u", g_eeprom.vfo_info[vfo_num].frequency_channel);
+						UI_PrintStringSmallest(String, x, (line + 0) * 8, false, true);
+					}
 				}
+				x += smallest_char_spacing * 4;
+
+				if (g_eeprom.vfo_info[vfo_num].compand)
+					UI_PrintStringSmallest("C", x, (line + 0) * 8, false, true);
+				//x += smallest_char_spacing * 1;
 			}
 			#endif
 		}
@@ -846,6 +857,8 @@ void UI_DisplayMain(void)
 		#else
 			if (g_eeprom.vfo_info[vfo_num].dtmf_decoding_enable)
 				UI_PrintStringSmall("DTMF", LCD_WIDTH + 78, 0, line + 1);
+				//UI_PrintStringSmall4x5("DTMF", LCD_WIDTH + 78, 0, line + 1);   // font table is currently wrong
+				//UI_PrintStringSmallest("DTMF", LCD_WIDTH + 78, (line + 1) * 8, false, true);
 		#endif
 
 		// show the audio scramble symbol
