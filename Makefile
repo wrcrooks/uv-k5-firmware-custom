@@ -64,7 +64,7 @@ ENABLE_TX_AUDIO_BAR              := 1
 # Side Button Menu 0.3 kb
 ENABLE_SIDE_BUTT_MENU            := 1
 # Key Lock 0.4 kb
-ENABLE_KEYLOCK                   := 1
+ENABLE_KEYLOCK                   := 0
 #ENABLE_PANADAPTER               := 0
 #ENABLE_SINGLE_VFO_CHAN          := 0
 
