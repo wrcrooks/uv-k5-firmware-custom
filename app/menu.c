@@ -71,7 +71,7 @@
 			//
 			EEPROM_ReadBuffer(0x1F88, &misc, 8);
 			misc.BK4819_XtalFreqLow = value;
-			EEPROM_WriteBuffer(0x1F88, &misc);
+			EEPROM_WriteBuffer8(0x1F88, &misc);
 		}
 	}
 #endif
@@ -103,6 +103,7 @@ int MENU_GetLimits(uint8_t Cursor, int32_t *pMin, int32_t *pMax)
 	switch (Cursor)
 	{
 		case MENU_SQL:
+		case MENU_CHAN_SQL:
 			*pMin = 0;
 			*pMax = 9;
 			break;
@@ -389,21 +390,25 @@ void MENU_AcceptSetting(void)
 
 		case MENU_SQL:
 			g_eeprom.squelch_level = g_sub_menu_selection;
-			g_vfo_configure_mode     = VFO_CONFIGURE;
+			g_vfo_configure_mode   = VFO_CONFIGURE;
 			break;
+
+		case MENU_CHAN_SQL:
+			g_tx_vfo->squelch_level = g_sub_menu_selection;
+			g_request_save_channel  = 1;
+			g_vfo_configure_mode    = VFO_CONFIGURE;
+			return;
 
 		case MENU_STEP:
 			g_tx_vfo->step_setting = step_freq_table_sorted[g_sub_menu_selection];
-			if (IS_FREQ_CHANNEL(g_tx_vfo->channel_save))
-			{
-				g_request_save_channel = 1;
-				return;
-			}
+			g_request_save_channel = 1;
+			g_vfo_configure_mode   = VFO_CONFIGURE_RELOAD;
 			return;
 
 		case MENU_TX_POWER:
 			g_tx_vfo->output_power = g_sub_menu_selection;
 			g_request_save_channel = 1;
+			g_vfo_configure_mode   = VFO_CONFIGURE_RELOAD;
 			return;
 
 		case MENU_TX_CDCSS:
@@ -494,7 +499,7 @@ void MENU_AcceptSetting(void)
 				else
 					BK4819_DisableScramble();
 			#endif
-			g_request_save_channel= 1;
+			g_request_save_channel = IS_FREQ_CHANNEL(g_tx_vfo->channel_save) ? 2 : 1;
 			return;
 
 		case MENU_BUSY_CHAN_LOCK:
@@ -527,7 +532,7 @@ void MENU_AcceptSetting(void)
 			// save the channel name
 			memset(g_tx_vfo->name, 0, sizeof(g_tx_vfo->name));
 			memmove(g_tx_vfo->name, g_edit, 10);
-			SETTINGS_SaveChannel(g_sub_menu_selection, g_eeprom.tx_vfo, g_tx_vfo, 3);
+			SETTINGS_save_channel(g_sub_menu_selection, g_eeprom.tx_vfo, g_tx_vfo, 3);
 			g_flag_reconfigure_vfos = true;
 			return;
 
@@ -542,7 +547,7 @@ void MENU_AcceptSetting(void)
 					g_eeprom.vox_level = g_sub_menu_selection - 1;
 				BOARD_EEPROM_LoadCalibration();
 				g_flag_reconfigure_vfos = true;
-				g_update_status        = true;
+				g_update_status         = true;
 				break;
 		#endif
 
@@ -614,14 +619,14 @@ void MENU_AcceptSetting(void)
 
 		case MENU_S_ADD1:
 			g_tx_vfo->scanlist_1_participation = g_sub_menu_selection;
-			SETTINGS_UpdateChannel(g_tx_vfo->channel_save, g_tx_vfo, true);
+			SETTINGS_save_chan_attribs_name(g_tx_vfo->channel_save, g_tx_vfo);
 			g_vfo_configure_mode = VFO_CONFIGURE;
 			g_flag_reset_vfos    = true;
 			return;
 
 		case MENU_S_ADD2:
 			g_tx_vfo->scanlist_2_participation = g_sub_menu_selection;
-			SETTINGS_UpdateChannel(g_tx_vfo->channel_save, g_tx_vfo, true);
+			SETTINGS_save_chan_attribs_name(g_tx_vfo->channel_save, g_tx_vfo);
 			g_vfo_configure_mode = VFO_CONFIGURE;	
 			g_flag_reset_vfos    = true;
 			return;
@@ -653,11 +658,11 @@ void MENU_AcceptSetting(void)
 		#endif
 
 		case MENU_COMPAND:
-			g_tx_vfo->compand      = g_sub_menu_selection;
+			g_tx_vfo->compand = g_sub_menu_selection;
 			#if 1
 				g_request_save_channel = 1;
 			#else
-				SETTINGS_SaveChannel(g_sub_menu_selection, g_eeprom.tx_vfo, g_tx_vfo, 3);
+				SETTINGS_save_channel(g_sub_menu_selection, g_eeprom.tx_vfo, g_tx_vfo, 3);
 				g_flag_reconfigure_vfos = true;
 			#endif
 			return;
@@ -694,7 +699,6 @@ void MENU_AcceptSetting(void)
 
 		case MENU_PTT_ID:
 			g_tx_vfo->dtmf_ptt_id_tx_mode = g_sub_menu_selection;
-			g_request_save_channel = 1;
 			if (g_tx_vfo->dtmf_ptt_id_tx_mode == PTT_ID_TX_DOWN ||
 			    g_tx_vfo->dtmf_ptt_id_tx_mode == PTT_ID_BOTH    ||
 			    g_tx_vfo->dtmf_ptt_id_tx_mode == PTT_ID_APOLLO)
@@ -702,6 +706,7 @@ void MENU_AcceptSetting(void)
 				g_eeprom.roger_mode = ROGER_MODE_OFF;
 				break;
 			}
+			g_request_save_channel = 1;
 			return;
 
 		case MENU_BAT_TXT:
@@ -757,7 +762,7 @@ void MENU_AcceptSetting(void)
 		case MENU_MOD_MODE:
 			g_tx_vfo->am_mode      = g_sub_menu_selection;
 			g_request_save_channel = 1;
-			return;
+		return;
 
 		#ifdef ENABLE_AM_FIX
 			case MENU_AM_FIX:
@@ -783,7 +788,7 @@ void MENU_AcceptSetting(void)
 		#endif
 
 		case MENU_MEM_DEL:
-			SETTINGS_UpdateChannel(g_sub_menu_selection, NULL, false);
+			SETTINGS_save_chan_attribs_name(g_sub_menu_selection, NULL);
 			g_vfo_configure_mode = VFO_CONFIGURE_RELOAD;
 			g_flag_reset_vfos    = true;
 			return;
@@ -855,12 +860,12 @@ void MENU_AcceptSetting(void)
 			g_battery_calibration[3] =          g_sub_menu_selection;         // 7.6V,  ~29%, 3 bars above this value
 			g_battery_calibration[4] = (788ul * g_sub_menu_selection) / 760;  // 7.88V, ~65%, 4 bars above this value
 			g_battery_calibration[5] = 2300;
-			EEPROM_WriteBuffer(0x1F40, g_battery_calibration);
+			EEPROM_WriteBuffer8(0x1F40, g_battery_calibration);
 
 			EEPROM_ReadBuffer( 0x1F48, buf, sizeof(buf));
 			buf[0] = g_battery_calibration[4];
 			buf[1] = g_battery_calibration[5];
-			EEPROM_WriteBuffer(0x1F48, buf);
+			EEPROM_WriteBuffer8(0x1F48, buf);
 
 			break;
 		}
@@ -932,6 +937,10 @@ void MENU_ShowCurrentSetting(void)
 	{
 		case MENU_SQL:
 			g_sub_menu_selection = g_eeprom.squelch_level;
+			break;
+
+		case MENU_CHAN_SQL:
+			g_sub_menu_selection = g_tx_vfo->squelch_level;
 			break;
 
 		case MENU_STEP:

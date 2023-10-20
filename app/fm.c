@@ -115,7 +115,7 @@ void FM_EraseChannels(void)
 
 	memset(Template, 0xFF, sizeof(Template));
 	for (i = 0; i < 5; i++)
-		EEPROM_WriteBuffer(0x0E40 + (i * 8), Template);
+		EEPROM_WriteBuffer8(0x0E40 + (i * 8), Template);
 
 	memset(g_fm_channels, 0xFF, sizeof(g_fm_channels));
 }
@@ -163,7 +163,7 @@ void FM_PlayAndUpdate(void)
 
 	FM_ConfigureChannelState();
 	BK1080_SetFrequency(g_eeprom.fm_frequency_playing);
-	SETTINGS_SaveFM();
+	SETTINGS_save_fm();
 
 	g_fm_play_count_down_10ms = 0;
 	g_schedule_fm             = false;

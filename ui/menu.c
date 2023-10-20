@@ -48,6 +48,7 @@ const t_menu_item g_menu_list[] =
 //   text,     voice ID,                               menu ID
 
 	{"SQL",    VOICE_ID_SQUELCH,                       MENU_SQL                   },
+	{"CH SQL", VOICE_ID_SQUELCH,                       MENU_CHAN_SQL              },
 	{"STEP",   VOICE_ID_FREQUENCY_STEP,                MENU_STEP                  },
 	{"W/N",    VOICE_ID_CHANNEL_BANDWIDTH,             MENU_BANDWIDTH             },
 	{"Tx PWR", VOICE_ID_POWER,                         MENU_TX_POWER              }, // was "TXP"
@@ -538,13 +539,23 @@ void UI_DisplayMenu(void)
 	switch (g_menu_cursor)
 	{
 		case MENU_SQL:
-			sprintf(String, "%d", g_sub_menu_selection);
+			strcpy(String, "MAIN SQL\n");
+			sprintf(String + strlen(String), "%d\n ", g_sub_menu_selection);
+			break;
+
+		case MENU_CHAN_SQL:
+			if (g_sub_menu_selection == 0)
+				strcpy(String, "USE\nMAIN SQL");
+			else
+				sprintf(String, "%d", g_sub_menu_selection);
+//			g_tx_vfo->squelch_level = g_sub_menu_selection;
+//			RADIO_ConfigureSquelchAndOutputPower(g_tx_vfo);
 			break;
 
 		case MENU_MIC_GAIN:
 			{	// display the mic gain in actual dB rather than just an index number
 				const uint8_t mic = g_mic_gain_dB_2[g_sub_menu_selection];
-				sprintf(String, "+%u.%01udB", mic / 2, mic % 2);
+				sprintf(String, "+%u.%udB", mic / 2, mic % 2);
 			}
 			break;
 

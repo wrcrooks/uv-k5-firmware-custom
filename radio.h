@@ -84,6 +84,8 @@ typedef struct vfo_info_t
 
 	uint8_t        tx_offset_freq_dir;
 
+	uint8_t        squelch_level;   // per channel squelch level
+	
 	uint8_t        squelch_open_rssi_thresh;
 	uint8_t        squelch_open_noise_thresh;
 	uint8_t        squelch_close_glitch_thresh;
@@ -113,6 +115,8 @@ typedef struct vfo_info_t
 
 	uint8_t        compand;
 
+	uint8_t        frequency_channel; // channel number if the VFO's frequency is found stored in a channel
+
 	char           name[16];
 } vfo_info_t;
 
@@ -128,10 +132,10 @@ extern vfo_state_t     g_vfo_state[2];
 
 bool     RADIO_CheckValidChannel(uint16_t ChNum, bool bCheckScanList, uint8_t RadioNum);
 uint8_t  RADIO_FindNextChannel(uint8_t ChNum, scan_state_dir_t Direction, bool bCheckScanList, uint8_t RadioNum);
-void     RADIO_InitInfo(vfo_info_t *pInfo, const uint8_t ChannelSave, const uint32_t Frequency);
+void     RADIO_InitInfo(vfo_info_t *p_vfo, const uint8_t ChannelSave, const uint32_t Frequency);
 void     RADIO_configure_channel(const unsigned int VFO, const unsigned int configure);
-void     RADIO_ConfigureSquelchAndOutputPower(vfo_info_t *pInfo);
-void     RADIO_ApplyOffset(vfo_info_t *pInfo);
+void     RADIO_ConfigureSquelchAndOutputPower(vfo_info_t *p_vfo);
+void     RADIO_ApplyOffset(vfo_info_t *p_vfo);
 void     RADIO_select_vfos(void);
 void     RADIO_setup_registers(bool switch_to_function_foreground);
 #ifdef ENABLE_NOAA
