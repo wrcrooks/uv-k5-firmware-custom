@@ -26,7 +26,7 @@ enum frequency_band_e {
 	BAND_NONE   = -1,
 	BAND1_50MHz =  0,
 	BAND2_108MHz,
-	BAND3_136MHz,
+	BAND3_137MHz,
 	BAND4_174MHz,
 	BAND5_350MHz,
 	BAND6_400MHz,
@@ -41,7 +41,11 @@ typedef struct {
 
 extern uint32_t g_aircopy_freq;
 
-extern const freq_band_table_t FM_RADIO_BAND;
+extern const freq_band_table_t AIR_BAND;
+
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+	extern const freq_band_table_t FM_RADIO_BAND;
+#endif
 
 extern const freq_band_table_t BX4819_BAND1;
 extern const freq_band_table_t BX4819_BAND2;
@@ -89,7 +93,9 @@ void             FREQUENCY_init(void);
 
 frequency_band_t FREQUENCY_GetBand(uint32_t Frequency);
 uint8_t          FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid, uint8_t TxpHigh, int32_t LowerLimit, int32_t Middle, int32_t UpperLimit, int32_t Frequency);
-uint32_t         FREQUENCY_FloorToStep(uint32_t Upper, uint32_t Step, uint32_t Lower);
+
+uint32_t         FREQUENCY_floor_to_step(uint32_t freq, const uint32_t step_size, const uint32_t lower, const uint32_t upper);
+uint32_t         FREQUENCY_wrap_to_step_band(uint32_t freq, const uint32_t step_size, const unsigned int band);
 
 int              FREQUENCY_tx_freq_check(const uint32_t Frequency);
 int              FREQUENCY_rx_freq_check(const uint32_t Frequency);

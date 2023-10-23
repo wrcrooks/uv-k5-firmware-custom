@@ -45,8 +45,9 @@ ENABLE_UART_DEBUG                := 0       just for code debugging, it sends de
 ENABLE_AIRCOPY                   := 1       clone radio-to-radio via RF
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1       remember the aircopy frequency
 ENABLE_AIRCOPY_RX_REBOOT         := 0       auto reboot on an aircopy successful RX completion
-ENABLE_FMRADIO                   := 1       WBFM VHF broadcast band receiver
-ENABLE_FMRADIO_64_108            := 0       '1' = ENABLE FM radio chips full range
+ENABLE_FMRADIO_68_108            := 0       enable FM radio 68MHz ~ 108MHz
+ENABLE_FMRADIO_76_108            := 0       enable FM radio 76MHz ~ 108MHz
+ENABLE_FMRADIO_875_108           := 1       enable FM radio 87.5MHz ~ 108MHz
 ENABLE_NOAA                      := 0       everything NOAA (only of any use in the USA)
 ENABLE_VOICE                     := 0       want to hear voices ?
 ENABLE_MUTE_RADIO_FOR_VOICE      := 1       mute the radios audio when a voice is playing
@@ -58,11 +59,12 @@ ENABLE_PWRON_PASSWORD            := 0       include power-on password code
 ENABLE_RESET_AES_KEY             := 1       '1' = reset/clear the AES key stored in the eeprom (only if it's set)
 ENABLE_BIG_FREQ                  := 0       big font frequencies (like original QS firmware)
 ENABLE_SMALL_BOLD                := 1       bold channel name/no. (when name + freq channel display mode)
+ENABLE_TRIM_TRAILING_ZEROS       := 1       trim away any trailing zeros on frequencies
 ENABLE_KEEP_MEM_NAME             := 1       maintain channel name when (re)saving memory channel
 ENABLE_WIDE_RX                   := 1       full 18MHz to 1300MHz RX (though front-end/PA not designed for full range)
 ENABLE_TX_WHEN_AM                := 0       allow TX (always FM) when RX is set to AM
 ENABLE_F_CAL_MENU                := 0       enable/disable the radios hidden frequency calibration menu
-ENABLE_TX_UNLOCK                 := 0       allow TX everywhere EXCEPT airband (108~136) .. TX harmonic content will cause interference to other services, do so entirely at your own risk !
+ENABLE_TX_UNLOCK                 := 0       allow TX everywhere EXCEPT airband (108~137) .. TX harmonic content will cause interference to other services, do so entirely at your own risk !
 ENABLE_CTCSS_TAIL_PHASE_SHIFT    := 0       standard CTCSS tail phase shift rather than QS's own 55Hz tone method
 ENABLE_CONTRAST                  := 0       add contrast menu
 ENABLE_BOOT_BEEPS                := 0       gives user audio feedback on volume knob position at boot-up

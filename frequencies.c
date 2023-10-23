@@ -22,11 +22,15 @@
 // the default AIRCOPY frequency
 uint32_t g_aircopy_freq = 41002500;
 
+const freq_band_table_t AIR_BAND = {10800000, 13700000};
+
 // FM broadcast band lower/upper limit
-#ifdef ENABLE_FMRADIO_64_108
+#if   defined(ENABLE_FMRADIO_68_108)
 	const freq_band_table_t FM_RADIO_BAND = {680, 1080};
-#else
-	const freq_band_table_t FM_RADIO_BAND = {880, 1080};
+#elif defined(ENABLE_FMRADIO_76_108)
+	const freq_band_table_t FM_RADIO_BAND = {760, 1080};
+#elif defined(ENABLE_FMRADIO_875_108)
+	const freq_band_table_t FM_RADIO_BAND = {875, 1080};
 #endif
 
 // the BK4819 has 2 bands it covers, 18MHz ~ 630MHz and 760MHz ~ 1300MHz
@@ -37,22 +41,22 @@ const freq_band_table_t FREQ_BAND_TABLE[7] =
 {
 	#ifdef ENABLE_WIDE_RX
 		// extended range
-		{ 1800000,  10800000},  // band 1
-		{10800000,  13600000},  // band 2
-		{13600000,  17400000},  // band 3
-		{17400000,  35000000},  // band 4
-		{35000000,  40000000},  // band 5
-		{40000000,  47000000},  // band 6
-		{47000000, 130000000}   // band 7
+		{BX4819_BAND1.lower, 10800000},             // band 1
+		{AIR_BAND.lower,     AIR_BAND.upper},       // band 2
+		{AIR_BAND.upper,     17400000},             // band 3
+		{17400000,           35000000},             // band 4
+		{35000000,           40000000},             // band 5
+		{40000000,           47000000},             // band 6
+		{47000000,           BX4819_BAND2.upper}    // band 7
 	#else
 		// QS original
-		{ 5000000,   7600000},  // band 1
-		{10800000,  13600000},  // band 2
-		{13600000,  17400000},  // band 3
-		{17400000,  35000000},  // band 4
-		{35000000,  40000000},  // band 5
-		{40000000,  47000000},  // band 6
-		{47000000,  60000000}   // band 7
+		{ 5000000,       7600000},         // band 1
+		{AIR_BAND.lower, AIR_BAND.upper},  // band 2
+		{AIR_BAND.upper, 17400000},        // band 3
+		{17400000,       35000000},        // band 4
+		{35000000,       40000000},        // band 5
+		{40000000,       47000000},        // band 6
+		{47000000,       60000000}         // band 7
 	#endif
 };
 
@@ -153,29 +157,49 @@ uint8_t FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid, uint8_t T
 	return pwr;
 }
 
-uint32_t FREQUENCY_FloorToStep(uint32_t Upper, uint32_t Step, uint32_t Lower)
+uint32_t FREQUENCY_floor_to_step(uint32_t freq, const uint32_t step_size, const uint32_t lower, const uint32_t upper)
 {
-	#if 1
-		uint32_t Index;
+	uint32_t delta;
 
-		if (Step == 833)
-		{
-			const uint32_t Delta = Upper - Lower;
-			uint32_t       Base  = (Delta / 2500) * 2500;
-			const uint32_t Index = ((Delta - Base) % 2500) / 833;
+	if (freq <= lower)
+		return lower;
 
-			if (Index == 2)
-				Base++;
+	if (freq > (upper - 1))
+		freq =  upper - 1;
 
-			return Lower + Base + (Index * 833);
-		}
+	delta = freq - lower;
 
-		Index = (Upper - Lower) / Step;
+	if (delta < step_size)
+		return lower;
+		
+	if (step_size == 833)
+	{
+		uint32_t           base  =  (delta / 2500) * 2500;	// 25kHz step
+		const unsigned int index = ((delta - base) % 2500) / step_size;
 
-		return Lower + (Step * Index);
-	#else
-		return Lower + (((Upper - Lower) / Step) * Step);
-	#endif
+		if (index == 2)
+			base++;
+
+		freq = lower + base + (step_size * index);
+	}
+	else
+		freq = lower + ((delta / step_size) * step_size);
+	
+	return freq;
+}
+
+uint32_t FREQUENCY_wrap_to_step_band(uint32_t freq, const uint32_t step_size, const unsigned int band)
+{
+	const uint32_t upper = FREQ_BAND_TABLE[band].upper; 
+	const uint32_t lower = FREQ_BAND_TABLE[band].lower; 
+	
+	if (freq < lower)
+		return FREQUENCY_floor_to_step(upper, step_size, lower, upper);
+	
+	if (freq >= upper)
+		freq = lower;
+	
+	return freq;
 }
 
 int FREQUENCY_tx_freq_check(const uint32_t Frequency)
@@ -188,7 +212,7 @@ int FREQUENCY_tx_freq_check(const uint32_t Frequency)
 	if (Frequency >= BX4819_BAND1.upper && Frequency < BX4819_BAND2.lower)
 		return -1;  // BX radio chip does not work in this range
 
-	if (Frequency >= 10800000 && Frequency < 13600000)
+	if (Frequency >= AIR_BAND.lower && Frequency < AIR_BAND.upper)
 		return -1;  // TX not allowed in the airband
 
 	if (Frequency < FREQ_BAND_TABLE[0].lower || Frequency > FREQ_BAND_TABLE[ARRAY_SIZE(FREQ_BAND_TABLE) - 1].upper)
@@ -197,7 +221,7 @@ int FREQUENCY_tx_freq_check(const uint32_t Frequency)
 	switch (g_setting_freq_lock)
 	{
 		case FREQ_LOCK_NORMAL:
-			if (Frequency >= 13600000 && Frequency < 17400000) 	//Frequency Between 136-174 Mhz
+			if (Frequency >= AIR_BAND.upper && Frequency < 17400000) 	//Frequency Between 137-174 Mhz
 				return 0;
 			if (Frequency >= 17400000 && Frequency < 35000000) 	//Frequency Between 174-350 Mhz + 174 TX Enabled
 				if (g_setting_174_tx_enable)
@@ -234,14 +258,14 @@ int FREQUENCY_tx_freq_check(const uint32_t Frequency)
 			break;
 
 		case FREQ_LOCK_430:
-			if (Frequency >= 13600000 && Frequency < 17400000)
+			if (Frequency >= AIR_BAND.lower && Frequency < 17400000)
 				return 0;
 			if (Frequency >= 40000000 && Frequency < 43000000)
 				return 0;
 			break;
 
 		case FREQ_LOCK_438:
-			if (Frequency >= 13600000 && Frequency < 17400000)
+			if (Frequency >= AIR_BAND.lower && Frequency < 17400000)
 				return 0;
 			if (Frequency >= 40000000 && Frequency < 43800000)
 				return 0;

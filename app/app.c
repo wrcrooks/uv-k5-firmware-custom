@@ -23,7 +23,7 @@
 #endif
 #include "app/app.h"
 #include "app/dtmf.h"
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	#include "app/fm.h"
 #endif
 #include "app/generic.h"
@@ -36,7 +36,7 @@
 #include "board.h"
 #include "bsp/dp32g030/gpio.h"
 #include "driver/backlight.h"
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	#include "driver/bk1080.h"
 #endif
 #include "driver/bk4819.h"
@@ -456,7 +456,7 @@ void APP_start_listening(function_type_t Function, const bool reset_am_fix)
 	if (g_setting_backlight_on_tx_rx >= 2)
 		backlight_turn_on(backlight_tx_rx_time_500ms);
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_mode)
 			BK1080_Init(0, false);
 	#endif
@@ -554,7 +554,7 @@ void APP_start_listening(function_type_t Function, const bool reset_am_fix)
 
 	FUNCTION_Select(Function);
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (Function == FUNCTION_MONITOR || g_fm_radio_mode)
 	#else
 		if (Function == FUNCTION_MONITOR)
@@ -586,11 +586,12 @@ uint32_t APP_set_frequency_by_step(vfo_info_t *pInfo, int8_t Step)
 		Frequency = Lower + Base + (Index * 833);
 	}
 
-	if (Frequency >= FREQ_BAND_TABLE[pInfo->band].upper)
-		Frequency =  FREQ_BAND_TABLE[pInfo->band].lower;
-	else
-	if (Frequency < FREQ_BAND_TABLE[pInfo->band].lower)
-		Frequency = FREQUENCY_FloorToStep(FREQ_BAND_TABLE[pInfo->band].upper, pInfo->step_freq, FREQ_BAND_TABLE[pInfo->band].lower);
+//	if (Frequency >= FREQ_BAND_TABLE[pInfo->band].upper)
+//		Frequency =  FREQ_BAND_TABLE[pInfo->band].lower;
+//	else
+//	if (Frequency < FREQ_BAND_TABLE[pInfo->band].lower)
+//		Frequency = FREQUENCY_floor_to_step(FREQ_BAND_TABLE[pInfo->band].upper, pInfo->step_freq, FREQ_BAND_TABLE[pInfo->band].lower);
+	Frequency = FREQUENCY_wrap_to_step_band(Frequency, pInfo->step_freq, pInfo->band);
 
 	return Frequency;
 }
@@ -1011,7 +1012,7 @@ void APP_end_tx(void)
 			g_vox_pause_count_down = 0;
 		}
 
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			if (g_fm_radio_mode)
 				return;
 		#endif
@@ -1104,7 +1105,7 @@ void APP_process(void)
 
 	APP_process_function();
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_mode && g_fm_radio_count_down_500ms > 0)
 			return;
 	#endif
@@ -1172,7 +1173,7 @@ void APP_process(void)
 		#ifdef ENABLE_VOICE
 			g_voice_write_index == 0 &&
 		#endif
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			!g_fm_radio_mode &&
 		#endif
 	    g_dtmf_call_state == DTMF_CALL_STATE_NONE &&
@@ -1192,7 +1193,7 @@ void APP_process(void)
 		g_rx_reception_mode = RX_MODE_NONE;
 	}
 
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	if (g_schedule_fm                          &&
 		g_fm_scan_state    != FM_SCAN_OFF      &&
 		g_current_function != FUNCTION_MONITOR &&
@@ -1213,7 +1214,7 @@ void APP_process(void)
 	{
 		#ifdef ENABLE_NOAA
 			if (
-			#ifdef ENABLE_FMRADIO
+			#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			    g_fm_radio_mode                        ||
 			#endif
 				g_ptt_is_pressed                       ||
@@ -1239,7 +1240,7 @@ void APP_process(void)
 			}
 		#else
 			if (
-				#ifdef ENABLE_FMRADIO
+				#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 					g_fm_radio_mode                    ||
 			    #endif
 				g_ptt_is_pressed                       ||
@@ -1561,7 +1562,7 @@ void APP_time_slice_10ms(void)
 		g_flag_save_settings = false;
 	}
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_flag_save_fm)
 		{
 			SETTINGS_save_fm();
@@ -1647,7 +1648,7 @@ void APP_time_slice_10ms(void)
 
 	// Skipping authentic device checks
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_mode && g_fm_radio_count_down_500ms > 0)
 			return;
 	#endif
@@ -1729,7 +1730,7 @@ void APP_time_slice_10ms(void)
 		}
 	}
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_mode && g_fm_restore_count_down_10ms > 0)
 		{
 			if (--g_fm_restore_count_down_10ms == 0)
@@ -1971,7 +1972,7 @@ void APP_cancel_user_input_modes(void)
 	if (g_dtmf_input_mode || g_dtmf_input_box_index > 0)
 	{
 		DTMF_clear_input_box();
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			if (g_fm_radio_mode)
 				g_request_display_screen = DISPLAY_FM;
 			else
@@ -2050,7 +2051,7 @@ void APP_time_slice_500ms(void)
 
 	// Skipped authentic device check
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_count_down_500ms > 0)
 		{
 			g_fm_radio_count_down_500ms--;
@@ -2109,7 +2110,7 @@ void APP_time_slice_500ms(void)
 		#endif
 	}
 
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	if (g_fm_scan_state == FM_SCAN_OFF || g_ask_to_save)
 #endif
 	{
@@ -2177,7 +2178,7 @@ void APP_time_slice_500ms(void)
 					{
 						gui_display_type_t disp = DISPLAY_INVALID;
 
-						#ifdef ENABLE_FMRADIO
+						#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 							if (g_fm_radio_mode &&
 								g_current_function != FUNCTION_RECEIVE &&
 								g_current_function != FUNCTION_MONITOR &&
@@ -2206,7 +2207,7 @@ void APP_time_slice_500ms(void)
 	if (g_current_function != FUNCTION_POWER_SAVE && g_current_function != FUNCTION_TRANSMIT)
 		APP_update_rssi(g_eeprom.rx_vfo);
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (!g_ptt_is_pressed && g_fm_resume_count_down_500ms > 0)
 		{
 			if (--g_fm_resume_count_down_500ms == 0)
@@ -2479,7 +2480,7 @@ static void APP_process_key(const key_code_t Key, const bool key_pressed, const 
 			g_keypad_locked  = 4;          // 2 second pop-up
 			g_update_display = true;
 
-			#ifdef ENABLE_FMRADIO
+			#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 				if (!g_fm_radio_mode)  // don't beep when the FM radio is on, it cause bad gaps and loud clicks
 			#endif
 					g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
@@ -2672,7 +2673,7 @@ static void APP_process_key(const key_code_t Key, const bool key_pressed, const 
 					MAIN_process_key(Key, key_pressed, key_held);
 					break;
 
-				#ifdef ENABLE_FMRADIO
+				#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 					case DISPLAY_FM:
 						FM_process_key(Key, key_pressed, key_held);
 						break;
@@ -2708,7 +2709,7 @@ static void APP_process_key(const key_code_t Key, const bool key_pressed, const 
 		}
 		else
 		{
-			#ifdef ENABLE_FMRADIO
+			#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 				if (!g_fm_radio_mode)
 			#endif
 					if (!key_held && key_pressed)
@@ -2750,7 +2751,7 @@ Skip:
 		g_update_status         = true;
 	}
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_request_save_fm)
 		{
 			if (!key_held)

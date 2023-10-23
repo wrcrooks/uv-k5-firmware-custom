@@ -18,7 +18,7 @@
 
 #include "app/action.h"
 #include "app/app.h"
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	#include "app/fm.h"
 #endif
 #include "app/generic.h"
@@ -43,7 +43,7 @@
 void toggle_chan_scanlist(void)
 {	// toggle the selected channels scanlist setting
 
-//	if (IS_FREQ_CHANNEL(g_tx_vfo->channel_save))
+//	if (IS_FREQ_CHANNEL(g_tx_vfo->channel_save))    // TODO: include the VFO freq as a channel when scanning
 	if (IS_NOAA_CHANNEL(g_tx_vfo->channel_save))
 	{
 		g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
@@ -186,7 +186,7 @@ void processFKeyFunction(const key_code_t Key)
 			if (g_scan_state_dir != SCAN_STATE_DIR_OFF)
 				APP_stop_scan();
 
-			#ifdef ENABLE_FMRADIO
+			#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 				ACTION_FM();
 			#else
 
@@ -212,10 +212,10 @@ void processFKeyFunction(const key_code_t Key)
 			if (g_setting_350_enable || Band != BAND5_350MHz)
 			{
 				if (Band > BAND7_470MHz)
-					Band = BAND1_50MHz;
+					Band = BAND1_50MHz;   // wrap-a-round
 			}
 			else
-				Band = BAND6_400MHz;
+				Band = BAND6_400MHz;      // jump to next band
 			g_tx_vfo->band = Band;
 
 			g_eeprom.screen_channel[Vfo] = FREQ_CHANNEL_FIRST + Band;
@@ -545,10 +545,9 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 				RADIO_configure_channel(Vfo, VFO_CONFIGURE_RELOAD);
 			}
 
-//			Frequency += 75;                        // is this meant to be rounding ?
-			Frequency += g_tx_vfo->step_freq / 2;   // no idea, but this is
+			Frequency += g_tx_vfo->step_freq / 2; // for rounding to nearest step size
 
-			Frequency = FREQUENCY_FloorToStep(Frequency, g_tx_vfo->step_freq, FREQ_BAND_TABLE[g_tx_vfo->band].lower);
+			Frequency = FREQUENCY_floor_to_step(Frequency, g_tx_vfo->step_freq, FREQ_BAND_TABLE[g_tx_vfo->band].lower, FREQ_BAND_TABLE[g_tx_vfo->band].upper);
 
 			if (Frequency >= BX4819_BAND1.upper && Frequency < BX4819_BAND2.lower)
 			{	// clamp the frequency to the limit
@@ -626,7 +625,7 @@ void MAIN_Key_EXIT(bool key_pressed, bool key_held)
 			return;
 		}
 
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			if (!g_fm_radio_mode)
 		#endif
 		{
@@ -656,7 +655,7 @@ void MAIN_Key_EXIT(bool key_pressed, bool key_held)
 			return;
 		}
 
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			ACTION_FM();
 		#endif
 
@@ -996,7 +995,7 @@ void MAIN_process_key(key_code_t key, bool key_pressed, bool key_held)
 //		UART_printf(" main 1 key %2u %u %u %u\r\n", key, key_pressed, key_held);
 	#endif
 
-	#ifdef ENABLE_FMRADIO
+	#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 		if (g_fm_radio_mode && key != KEY_PTT && key != KEY_EXIT)
 		{
 			if (!key_held && key_pressed)

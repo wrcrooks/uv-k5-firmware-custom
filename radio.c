@@ -18,7 +18,7 @@
 
 #include "app/app.h"
 #include "app/dtmf.h"
-#ifdef ENABLE_FMRADIO
+#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 	#include "app/fm.h"
 #endif
 #include "audio.h"
@@ -311,25 +311,19 @@ void RADIO_configure_channel(const unsigned int VFO, const unsigned int configur
 
 	Frequency = p_vfo->freq_config_rx.frequency;
 
-#if 1
-	// fix previously maybe incorrect set band
-	Band = FREQUENCY_GetBand(Frequency);
-	p_vfo->band = Band;
-#endif
-
 	if (Frequency < FREQ_BAND_TABLE[Band].lower)
 		Frequency = FREQ_BAND_TABLE[Band].lower;
 	else
-	if (Frequency > FREQ_BAND_TABLE[Band].upper)
-		Frequency = FREQ_BAND_TABLE[Band].upper;
+	if (Frequency >= FREQ_BAND_TABLE[Band].upper)
+		Frequency = FREQUENCY_floor_to_step(Frequency, p_vfo->step_freq, FREQ_BAND_TABLE[Band].lower, FREQ_BAND_TABLE[Band].upper);
 	else
 	if (Channel >= FREQ_CHANNEL_FIRST)
-		Frequency = FREQUENCY_FloorToStep(Frequency, p_vfo->step_freq, FREQ_BAND_TABLE[Band].lower);
+		Frequency = FREQUENCY_floor_to_step(Frequency, p_vfo->step_freq, FREQ_BAND_TABLE[Band].lower, FREQ_BAND_TABLE[Band].upper);
 
 	if (!g_setting_350_enable && Frequency >= 35000000 && Frequency < 40000000)
 	{	// 350~400Mhz not allowed
 
-		// hop onto the euro ham band
+		// hop onto the next band up
 		Frequency                       = 43350000;
 		p_vfo->freq_config_rx.frequency = Frequency;
 		p_vfo->freq_config_tx.frequency = Frequency;
@@ -338,11 +332,16 @@ void RADIO_configure_channel(const unsigned int VFO, const unsigned int configur
 		p_vfo->frequency_reverse        = 0;
 		p_vfo->tx_offset_freq_dir       = TX_OFFSET_FREQ_DIR_OFF;
 		p_vfo->tx_offset_freq           = 0;
+		
+		
+		// TODO: also update other settings such as step size
+		
+		
 	}
 
 	p_vfo->freq_config_rx.frequency = Frequency;
 
-	if (Frequency >= 10800000 && Frequency < 13600000)
+	if (Frequency >= AIR_BAND.lower && Frequency < AIR_BAND.upper)
 	{	// air band
 		p_vfo->tx_offset_freq_dir = TX_OFFSET_FREQ_DIR_OFF;
 		p_vfo->tx_offset_freq     = 0;
@@ -350,7 +349,7 @@ void RADIO_configure_channel(const unsigned int VFO, const unsigned int configur
 	else
 	if (Channel > USER_CHANNEL_LAST)
 	{
-		p_vfo->tx_offset_freq = FREQUENCY_FloorToStep(p_vfo->tx_offset_freq, p_vfo->step_freq, 0);
+		p_vfo->tx_offset_freq = FREQUENCY_floor_to_step(p_vfo->tx_offset_freq, p_vfo->step_freq, 0, p_vfo->tx_offset_freq);
 	}
 
 	RADIO_ApplyOffset(p_vfo);
@@ -508,7 +507,7 @@ void RADIO_ConfigureSquelchAndOutputPower(vfo_info_t *p_vfo)
 	//
 	// 1ED0    32 32 32   64 64 64   8C 8C 8C   FF FF FF FF FF FF FF ..  50 MHz
 	// 1EE0    32 32 32   64 64 64   8C 8C 8C   FF FF FF FF FF FF FF .. 108 MHz
-	// 1EF0    5F 5F 5F   69 69 69   91 91 8F   FF FF FF FF FF FF FF .. 136 MHz
+	// 1EF0    5F 5F 5F   69 69 69   91 91 8F   FF FF FF FF FF FF FF .. 137 MHz
 	// 1F00    32 32 32   64 64 64   8C 8C 8C   FF FF FF FF FF FF FF .. 174 MHz
 	// 1F10    5A 5A 5A   64 64 64   82 82 82   FF FF FF FF FF FF FF .. 350 MHz
 	// 1F20    5A 5A 5A   64 64 64   8F 91 8A   FF FF FF FF FF FF FF .. 400 MHz
@@ -737,7 +736,7 @@ void RADIO_setup_registers(bool switch_to_function_foreground)
 
 	#ifdef ENABLE_VOX
 		if (
-			#ifdef ENABLE_FMRADIO
+			#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 				!g_fm_radio_mode &&
 			#endif
 			g_eeprom.vox_switch &&
@@ -920,7 +919,7 @@ void RADIO_Setg_vfo_state(vfo_state_t State)
 		g_vfo_state[0] = VFO_STATE_NORMAL;
 		g_vfo_state[1] = VFO_STATE_NORMAL;
 
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			g_fm_resume_count_down_500ms = 0;
 		#endif
 	}
@@ -937,7 +936,7 @@ void RADIO_Setg_vfo_state(vfo_state_t State)
 			g_vfo_state[vfo] = State;
 		}
 
-		#ifdef ENABLE_FMRADIO
+		#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
 			g_fm_resume_count_down_500ms = fm_resume_countdown_500ms;
 		#endif
 	}
