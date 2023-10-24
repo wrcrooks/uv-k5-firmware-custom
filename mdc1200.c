@@ -132,13 +132,106 @@ uint16_t reverse_bits(const uint16_t bits_in, const unsigned int num_bits)
 
 #define FEC_K   7
 
+void error_correction(uint8_t *data)
+{
+	int     i;
+	uint8_t shift_reg;
+	uint8_t syn;
+
+	for (i = 0, shift_reg = 0, syn = 0; i < FEC_K; i++)
+	{
+		const uint8_t bi = data[i];
+		int bit_num;
+		for (bit_num = 0; bit_num < 8; bit_num++)
+		{
+			uint8_t b;
+			unsigned int k = 0;
+
+			shift_reg = (shift_reg << 1) | ((bi >> bit_num) & 1u);
+			b         = ((shift_reg >> 6) ^ (shift_reg >> 5) ^ (shift_reg >> 2) ^ (shift_reg >> 0)) & 1u;
+			syn       = (syn << 1) | (((b ^ (data[i + FEC_K] >> bit_num)) & 1u) ? 1u : 0u);
+
+			if (syn & 0x80) k++;
+			if (syn & 0x20) k++;
+			if (syn & 0x04) k++;
+			if (syn & 0x02) k++;
+
+			if (k >= 3)
+			{	// correct bit error
+				int ii = i;
+				int bn = bit_num - 7;
+				if (bn < 0)
+				{
+					bn += 8;
+					ii--;
+				}
+				if (ii >= 0)
+					data[ii] ^= 1u << bn;
+				syn ^= 0xA6;   // 10100110
+			}
+		}
+	}
+}
+
+uint8_t * decode_data(uint8_t *data)
+{
+	uint16_t crc1;
+	uint16_t crc2;
+
+//	(void)data;
+
+	{	// de-interleave
+
+		unsigned int i;
+		unsigned int k;
+		unsigned int m;
+		uint8_t deinterleaved[(FEC_K * 2) * 8];
+
+		// de-interleave the received bits
+		for (i = 0, k = 0; i < 16; i++)
+		{
+			for (m = 0; m < FEC_K; m++)
+			{
+				const unsigned int n = (m * 16) + i;
+				deinterleaved[k++] = (data[n >> 3] >> ((7 - n) & 7u)) & 1u;
+			}
+		}
+
+		// copy the de-interleaved bits to the data buffer
+		for (i = 0, m = 0; i < (FEC_K * 2); i++)
+		{
+			unsigned int k;
+			uint8_t b = 0;
+			for (k = 0; k < 8; k++)
+				if (deinterleaved[m++])
+					b |= 1u << k;
+			data[i] = b;
+		}
+	}
+
+	error_correction(data);
+
+	crc1 = compute_crc(data, 4);
+	crc2 = (data[5] << 8) | (data[4] << 0);
+
+	if (crc1 != crc2)
+		return NULL;
+
+	// appears to be a valid packet
+
+
+
+	// TODO: more stuff
+
+
+
+
+	return NULL;
+}
+
 uint8_t * encode_data(uint8_t *data)
 {
-	unsigned int i;
-
 	// R=1/2 K=7 convolutional coder
-	//
-	// create the FEC bits
 	//
 	// op     0x01
 	// arg    0x80
@@ -152,27 +245,28 @@ uint8_t * encode_data(uint8_t *data)
 	// 1. reverse the bit order for each byte of the first 7 bytes (to undo the reversal performed for display, above)
 	// 2. feed those bits into a shift register which is preloaded with all zeros
 	// 3. for each bit, calculate the modulo-2 sum: bit(n-0) + bit(n-2) + bit(n-5) + bit(n-6)
-	// 4. then for each byte of resulting output, again reverse those bits to generate the values listed above (for display)
-	//
-	{
+	// 4. then for each byte of resulting output, again reverse those bits to generate the values shown above
+
+	{	// add the FEC bits to the end of the data
+		unsigned int i;
 		uint8_t shift_reg = 0;
 		for (i = 0; i < FEC_K; i++)
 		{
-			unsigned int  bit;
+			unsigned int  bit_num;
 			const uint8_t bi = data[i];
 			uint8_t       bo = 0;
-
-			for (bit = 0; bit < 8; bit++)
+			for (bit_num = 0; bit_num < 8; bit_num++)
 			{
-				shift_reg = (shift_reg << 1) | ((bi >> bit) & 1u);
-				bo |= (((shift_reg >> 6) ^ (shift_reg >> 5) ^ (shift_reg >> 2) ^ (shift_reg >> 0)) & 1u) << bit;
+				shift_reg = (shift_reg << 1) | ((bi >> bit_num) & 1u);
+				bo |= (((shift_reg >> 6) ^ (shift_reg >> 5) ^ (shift_reg >> 2) ^ (shift_reg >> 0)) & 1u) << bit_num;
 			}
-
-			data[i + FEC_K] = bo;
+			data[FEC_K + i] = bo;
 		}
 	}
 
-	{
+	{	// interleave the bits
+
+		unsigned int i;
 		unsigned int k;
 		unsigned int m;
 		uint8_t interleaved[(FEC_K * 2) * 8];
@@ -180,25 +274,25 @@ uint8_t * encode_data(uint8_t *data)
 		// bit interleaver
 		for (i = 0, k = 0, m = 0; i < (FEC_K * 2); i++)
 		{
-			unsigned int bit;
+			unsigned int bit_num;
 			const uint8_t b = data[i];
-			for (bit = 0; bit < 8; bit++)
+			for (bit_num = 0; bit_num < 8; bit_num++)
 			{
-				interleaved[k] = (b >> bit) & 1u;
+				interleaved[k] = (b >> bit_num) & 1u;
 				k += 16;
 				if (k >= sizeof(interleaved))
 					k = ++m;
 			}
 		}
 
-		// copy the interleaved bits to the output buffer
+		// copy the interleaved bits back to the input/output buffer
 		for (i = 0, k = 0; i < (FEC_K * 2); i++)
 		{
-			int bit;
+			int bit_num;
 			uint8_t b = 0;
-			for (bit = 7; bit >= 0; bit--)
+			for (bit_num = 7; bit_num >= 0; bit_num--)
 				if (interleaved[k++])
-					b |= 1u << bit;
+					b |= 1u << bit_num;
 			data[i] = b;
 		}
 	}

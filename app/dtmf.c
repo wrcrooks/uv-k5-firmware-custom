@@ -17,7 +17,7 @@
 #include <string.h>
 #include <stdio.h>   // NULL
 
-#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+#ifdef ENABLE_FMRADIO
 	#include "app/fm.h"
 #endif
 #include "app/search.h"
@@ -122,7 +122,7 @@ bool DTMF_FindContact(const char *pContact, char *pResult)
 
 		if (j == 3)
 		{
-			memmove(pResult, Contact, 8);
+			memcpy(pResult, Contact, 8);
 			pResult[8] = 0;
 			return true;
 		}
@@ -248,7 +248,7 @@ void DTMF_HandleRequest(void)
 	
 					g_dtmf_reply_state = DTMF_REPLY_AB;
 	
-					#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+					#ifdef ENABLE_FMRADIO
 						if (g_fm_radio_mode)
 						{
 							FM_TurnOff();
@@ -354,8 +354,8 @@ void DTMF_HandleRequest(void)
 
 			memset(g_dtmf_callee, 0, sizeof(g_dtmf_callee));
 			memset(g_dtmf_caller, 0, sizeof(g_dtmf_caller));
-			memmove(g_dtmf_callee, g_dtmf_rx + Offset + 0, 3);
-			memmove(g_dtmf_caller, g_dtmf_rx + Offset + 4, 3);
+			memcpy(g_dtmf_callee, g_dtmf_rx + Offset + 0, 3);
+			memcpy(g_dtmf_caller, g_dtmf_rx + Offset + 4, 3);
 
 			DTMF_clear_RX();
 

@@ -18,6 +18,7 @@ ENABLE_AIRCOPY                   := 1
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1
 ENABLE_AIRCOPY_RX_REBOOT         := 0
 # FM Radio 4.2 kB
+ENABLE_FMRADIO_76_90             := 0
 ENABLE_FMRADIO_68_108            := 1
 ENABLE_FMRADIO_76_108            := 0
 ENABLE_FMRADIO_875_108           := 0
@@ -65,7 +66,7 @@ ENABLE_RX_SIGNAL_BAR             := 0
 # Tx Timeout Bar 0.2 kB
 ENABLE_TX_TIMEOUT_BAR            := 0
 # Tx Audio Bar 0.3 kB
-ENABLE_TX_AUDIO_BAR              := 1
+ENABLE_TX_AUDIO_BAR              := 0
 # Side Button Menu 0.3 kB
 ENABLE_SIDE_BUTT_MENU            := 1
 # Key Lock 0.4 kB
@@ -100,6 +101,12 @@ ifeq ($(ENABLE_LTO),1)
 	ENABLE_OVERLAY := 0
 endif
 
+ifeq ($(filter $(ENABLE_FMRADIO_76_90) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+	ENABLE_FMRADIO := 1
+else
+	ENABLE_FMRADIO := 0
+endif
+
 ifeq ($(ENABLE_TX_TIMEOUT_BAR),1)
 	# can't have ENABLE_TX_TIMEOUT_BAR and ENABLE_TX_AUDIO_BAR enabled at same time
 	ENABLE_TX_AUDIO_BAR := 0
@@ -129,7 +136,7 @@ ifeq ($(ENABLE_UART),1)
 	OBJS += driver/aes.o
 endif
 OBJS += driver/backlight.o
-ifeq ($(filter $(ENABLE_FMRADIO_68_108) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+ifeq ($(ENABLE_FMRADIO), 1)
 	OBJS += driver/bk1080.o
 endif
 OBJS += driver/bk4819.o
@@ -158,7 +165,7 @@ ifeq ($(ENABLE_AIRCOPY),1)
 endif
 OBJS += app/app.o
 OBJS += app/dtmf.o
-ifeq ($(filter $(ENABLE_FMRADIO_68_108) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+ifeq ($(ENABLE_FMRADIO), 1)
 	OBJS += app/fm.o
 endif
 OBJS += app/generic.o
@@ -194,7 +201,7 @@ ifeq ($(ENABLE_AIRCOPY),1)
 	OBJS += ui/aircopy.o
 endif
 OBJS += ui/battery.o
-ifeq ($(filter $(ENABLE_FMRADIO_68_108) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+ifeq ($(ENABLE_FMRADIO), 1)
 	OBJS += ui/fmradio.o
 endif
 OBJS += ui/helper.o
@@ -284,6 +291,9 @@ endif
 ifeq ($(ENABLE_AIRCOPY_RX_REBOOT),1)
 	CFLAGS += -DENABLE_AIRCOPY_RX_REBOOT
 endif
+ifeq ($(ENABLE_FMRADIO_76_90),1)
+	CFLAGS += -DENABLE_FMRADIO_76_90
+endif
 ifeq ($(ENABLE_FMRADIO_68_108),1)
 	CFLAGS += -DENABLE_FMRADIO_68_108
 endif
@@ -292,6 +302,9 @@ ifeq ($(ENABLE_FMRADIO_76_108),1)
 endif
 ifeq ($(ENABLE_FMRADIO_875_108),1)
 	CFLAGS += -DENABLE_FMRADIO_875_108
+endif
+ifeq ($(ENABLE_FMRADIO),1)
+	CFLAGS += -DENABLE_FMRADIO
 endif
 ifeq ($(ENABLE_UART),1)
 	CFLAGS += -DENABLE_UART

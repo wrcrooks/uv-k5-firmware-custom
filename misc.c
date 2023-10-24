@@ -189,7 +189,7 @@ bool                  g_flag_reset_vfos;
 bool                  g_request_save_vfo;
 uint8_t               g_request_save_channel;
 bool                  g_request_save_settings;
-#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+#ifdef ENABLE_FMRADIO
 	bool              g_request_save_fm;
 #endif
 bool                  g_flag_prepare_tx;
@@ -200,7 +200,7 @@ bool                  g_flag_refresh_menu;
 bool                  g_flag_save_vfo;
 bool                  g_flag_save_settings;
 bool                  g_flag_save_channel;
-#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+#ifdef ENABLE_FMRADIO
 	bool              g_flag_save_fm;
 #endif
 bool                  g_cdcss_lost;
@@ -260,7 +260,7 @@ volatile bool         g_next_time_slice_40ms;
 	volatile bool     g_schedule_noaa       = true;
 #endif
 volatile bool         g_flag_tail_tone_elimination_complete;
-#if defined(ENABLE_FMRADIO_68_108) || defined(ENABLE_FMRADIO_76_108) || defined(ENABLE_FMRADIO_875_108)
+#ifdef ENABLE_FMRADIO
 	volatile bool     g_schedule_fm;
 #endif
 
@@ -346,8 +346,19 @@ void NUMBER_trim_trailing_zeros(char *str)
 {
 	if (str != NULL)
 	{
-		int i = (int)strlen(str) - 1;
-		while (i > 0 && (str[i] == '0' || str[i] == ' ') && str[i - 1] != '.')
-			str[i--] = 0;
+		bool found_dp = false;
+		int i = 0;
+		while (i < 16 && str[i] != 0)
+		{
+			if (str[i] == '.')
+				found_dp = true;
+			i++;
+		}
+		if (found_dp)
+		{
+			i--;
+			while (i > 0 && (str[i] == '0' || str[i] == ' ') && str[i - 1] != '.')
+				str[i--] = 0;
+		}
 	}
 }
