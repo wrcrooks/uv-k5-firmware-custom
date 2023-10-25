@@ -107,6 +107,9 @@ const t_menu_item g_menu_list[] =
 	{"ANI ID", VOICE_ID_ANI_CODE,                      MENU_ANI_ID                },
 	{"UpCODE", VOICE_ID_INVALID,                       MENU_UP_CODE               },
 	{"DnCODE", VOICE_ID_INVALID,                       MENU_DN_CODE               }, // was "DWCODE"
+#ifdef ENABLE_MDC1200
+	{"MDC ID", VOICE_ID_INVALID,                       MENU_MDC1200_ID            },
+#endif
 	{"PTT ID", VOICE_ID_INVALID,                       MENU_PTT_ID                },
 	{"D ST",   VOICE_ID_INVALID,                       MENU_DTMF_ST               },
     {"D RSP",  VOICE_ID_INVALID,                       MENU_DTMF_RSP              },
@@ -294,7 +297,7 @@ const char g_sub_menu_roger_mode[3][16] =
 {
 	"OFF",
 	"TX END\nROGER",
-	"TX END\nMDC\n1200"
+	"TX END\nMDC1200"
 };
 
 const char g_sub_menu_reset[2][4] =
@@ -992,6 +995,12 @@ void UI_DisplayMenu(void)
 			sprintf(str + strlen(str), "%dms", 10 * g_sub_menu_selection);
 			break;
 
+		#ifdef ENABLE_MDC1200
+			case MENU_MDC1200_ID:
+				sprintf(str, "MDC1200\nID\n%04X", g_sub_menu_selection);
+				break;
+		#endif
+
 		case MENU_PTT_ID:
 			strcpy(str, (g_sub_menu_selection > 0) ? "TX ID\n" : "");
 			strcat(str, g_sub_menu_ptt_id[g_sub_menu_selection]);
@@ -1228,6 +1237,7 @@ void UI_DisplayMenu(void)
 			UI_PrintString(str, sub_menu_x1, sub_menu_x2, 0, 8);
 
 			// channel name
+			memset(str, 0, sizeof(str));
 			BOARD_fetchChannelName(str, g_sub_menu_selection);
 			if (str[0] == 0)
 				strcpy(str, "--");

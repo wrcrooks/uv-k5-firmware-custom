@@ -12,7 +12,7 @@ ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 # UART Programming 2.9 kB
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 0
+ENABLE_UART_DEBUG                := 1
 # AirCopy 2.5 kB
 ENABLE_AIRCOPY                   := 1
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1
@@ -44,7 +44,7 @@ ENABLE_WIDE_RX                   := 1
 ENABLE_TX_WHEN_AM                := 1
 ENABLE_F_CAL_MENU                := 0
 ENABLE_TX_UNLOCK                 := 1
-ENABLE_CTCSS_TAIL_PHASE_SHIFT    := 0
+ENABLE_CTCSS_TAIL_PHASE_SHIFT    := 1
 ENABLE_CONTRAST                  := 0
 ENABLE_BOOT_BEEPS                := 0
 ENABLE_DTMF_CALL_FLASH_LIGHT     := 1
@@ -57,7 +57,7 @@ ENABLE_KILL_REVIVE               := 0
 # AM Fix 0.8 kB
 ENABLE_AM_FIX                    := 1
 ENABLE_AM_FIX_SHOW_DATA          := 0
-ENABLE_SQUELCH_MORE_SENSITIVE    := 1
+ENABLE_SQUELCH_MORE_SENSITIVE    := 0
 ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS  := 1
 ENABLE_FASTER_CHANNEL_SCAN       := 1
 ENABLE_COPY_CHAN_TO_VFO_TO_CHAN  := 1

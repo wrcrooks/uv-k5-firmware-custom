@@ -605,7 +605,10 @@ void BOARD_EEPROM_load(void)
 
 	// 0E98..0E9F
 	EEPROM_ReadBuffer(0x0E98, Data, 8);
-	memcpy(&g_eeprom.power_on_password, Data, sizeof(g_eeprom.power_on_password));
+	memcpy(&g_eeprom.power_on_password, &Data[0], sizeof(g_eeprom.power_on_password));
+	#ifdef ENABLE_MDC1200
+		memcpy(&g_eeprom.mdc1200_id, &Data[4], sizeof(g_eeprom.mdc1200_id));
+	#endif
 
 	// 0EA0..0EA7
 	#ifdef ENABLE_VOICE
@@ -942,8 +945,7 @@ void BOARD_fetchChannelName(char *s, const int channel)
 	if (!RADIO_CheckValidChannel(channel, false, 0))
 		return;
 
-	EEPROM_ReadBuffer(0x0F50 + (channel * 16), s + 0, 8);
-	EEPROM_ReadBuffer(0x0F58 + (channel * 16), s + 8, 2);
+	EEPROM_ReadBuffer(0x0F50 + (channel * 16), s, 10);
 
 	for (i = 0; i < 10; i++)
 		if (s[i] < 32 || s[i] > 127)
