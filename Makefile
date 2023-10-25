@@ -101,7 +101,7 @@ ifeq ($(ENABLE_LTO),1)
 	ENABLE_OVERLAY := 0
 endif
 
-ifeq ($(filter $(ENABLE_FMRADIO_76_90) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+ifeq ($(filter $(ENABLE_FMRADIO_76_90) $(ENABLE_FMRADIO_68_108) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
 	ENABLE_FMRADIO := 1
 else
 	ENABLE_FMRADIO := 0
@@ -254,7 +254,7 @@ CFLAGS =
 
 ifeq ($(ENABLE_CLANG),0)
 	#CFLAGS += -Os -Wall -Werror -mcpu=cortex-m0 -fno-builtin -fshort-enums -fno-delete-null-pointer-checks -std=c11 -MMD
-	CFLAGS += -Os -Werror -mcpu=cortex-m0 -std=c11 -MMD
+	CFLAGS += -Os -Werror -mcpu=cortex-m0 -fmodulo-sched -freorder-blocks-algorithm=stc -std=c11 -MMD
 else
 	# Oz needed to make it fit on flash
 	CFLAGS += -Oz -Werror -mcpu=cortex-m0 -fno-builtin -fshort-enums -fno-delete-null-pointer-checks -std=c11 -MMD
@@ -481,9 +481,9 @@ all: $(TARGET)
 
 	$(info PYTHON = $(PYTHON))
 
-#	-python fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
-#	-python3 fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
-	-$(PYTHON) fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
+	-python fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
+	-python3 fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
+#	-$(PYTHON) fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
 
 	$(SIZE) $<
 
