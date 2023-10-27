@@ -32,7 +32,7 @@
 #include "driver/st7565.h"
 #include "driver/system.h"
 #include "driver/systick.h"
-#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+#if defined(ENABLE_UART)
 	#include "driver/uart.h"
 #endif
 #include "helper/battery.h"
@@ -90,7 +90,7 @@ void Main(void)
 
 	BK4819_Init();
 
-	#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+	#if defined(ENABLE_UART)
 		UART_printf("bk4819  id %04X  rev %04X\r\n", BK4819_ReadRegister(0x00), BK4819_ReadRegister(0x01));
 	#endif
 	
