@@ -33,7 +33,9 @@
 #include "driver/crc.h"
 #include "driver/eeprom.h"
 #include "driver/gpio.h"
-#include "driver/uart.h"
+#if defined(ENABLE_UART)
+	#include "driver/uart.h"
+#endif
 #include "functions.h"
 #include "misc.h"
 #include "settings.h"
@@ -369,7 +371,7 @@ static void cmd_051D(const uint8_t *pBuffer)
 
 		#ifdef INCLUDE_AES
 			if (reload_eeprom)
-				BOARD_EEPROM_load();
+				BOARD_eeprom_load();
 		#endif
 	}
 

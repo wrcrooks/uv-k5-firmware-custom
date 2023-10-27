@@ -32,9 +32,14 @@
 #include "driver/st7565.h"
 #include "driver/system.h"
 #include "driver/systick.h"
-#include "driver/uart.h"
+#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+	#include "driver/uart.h"
+#endif
 #include "helper/battery.h"
 #include "helper/boot.h"
+#ifdef ENABLE_MDC1200
+	#include "mdc1200.h"
+#endif
 #include "misc.h"
 #include "radio.h"
 #include "settings.h"
@@ -90,11 +95,15 @@ void Main(void)
 
 	BK4819_Init();
 
+#ifdef ENABLE_MDC1200
+	mdc1200_init();
+#endif
+
 	BOARD_ADC_GetBatteryInfo(&g_usb_current_voltage, &g_usb_current);
 
-	BOARD_EEPROM_load();
+	BOARD_eeprom_load();
 
-	BOARD_EEPROM_LoadCalibration();
+	BOARD_eeprom_loadCalibration();
 
 	RADIO_configure_channel(0, VFO_CONFIGURE_RELOAD);
 	RADIO_configure_channel(1, VFO_CONFIGURE_RELOAD);
