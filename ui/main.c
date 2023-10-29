@@ -14,10 +14,6 @@
  *     limitations under the License.
  */
 
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wimplicit-fallthrough="
-	#pragma GCC diagnostic pop
-
 #include <string.h>
 #include <stdlib.h>  // abs()
 
@@ -34,6 +30,9 @@
 #include "font.h"
 #include "functions.h"
 #include "helper/battery.h"
+#ifdef ENABLE_MDC1200
+	#include "mdc1200.h"
+#endif
 #include "misc.h"
 #include "radio.h"
 #include "settings.h"
@@ -43,7 +42,7 @@
 #include "ui/menu.h"
 #include "ui/ui.h"
 
-center_line_t center_line = CENTER_LINE_NONE;
+center_line_t g_center_line = CENTER_LINE_NONE;
 
 // ***************************************************************************
 
@@ -83,10 +82,10 @@ void draw_bar(uint8_t *line, const int len, const int max_width)
 	{
 		unsigned int timeout_secs = 0;
 
-		if (g_current_function != FUNCTION_TRANSMIT || g_screen_to_display != DISPLAY_MAIN)
+		if (g_current_function != FUNCTION_TRANSMIT || g_current_display_screen != DISPLAY_MAIN)
 			return false;
 
-		if (center_line != CENTER_LINE_NONE && center_line != CENTER_LINE_TX_TIMEOUT)
+		if (g_center_line != CENTER_LINE_NONE && g_center_line != CENTER_LINE_TX_TIMEOUT)
 			return false;
 
 		if (g_eeprom.tx_timeout_timer == 0)
@@ -97,7 +96,7 @@ void draw_bar(uint8_t *line, const int len, const int max_width)
 		else
 			timeout_secs = 60 * 15;  // 15 minutes
 
-		if (timeout_secs == 0 || g_tx_timer_count_down_500ms == 0)
+		if (timeout_secs == 0 || g_tx_timer_tick_500ms == 0)
 			return false;
 
 		{
@@ -105,7 +104,7 @@ void draw_bar(uint8_t *line, const int len, const int max_width)
 			const unsigned int txt_width = 7 * 6;                 // 6 text chars
 			const unsigned int bar_x     = 2 + txt_width + 4;     // X coord of bar graph
 			const unsigned int bar_width = LCD_WIDTH - 1 - bar_x;
-			const unsigned int secs      = g_tx_timer_count_down_500ms / 2;
+			const unsigned int secs      = g_tx_timer_tick_500ms / 2;
 			const unsigned int level     = ((secs * bar_width) + (timeout_secs / 2)) / timeout_secs;   // with rounding
 //			const unsigned int level     = (((timeout_secs - secs) * bar_width) + (timeout_secs / 2)) / timeout_secs;   // with rounding
 			const unsigned int len       = (level <= bar_width) ? level : bar_width;
@@ -155,30 +154,27 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 
 #ifdef ENABLE_TX_AUDIO_BAR
 
-	uint32_t sqrt16(uint32_t value)
-	{	// return square root of 'value'
-		unsigned int shift = 16;         // this is the number of bits supplied in 'value' .. 2 ~ 32
-		uint32_t     bit   = 1u << --shift;
-		uint32_t     sqrti = 0;
-		while (bit)
+	// linear search, ascending, using addition
+	uint16_t isqrt(const uint32_t y)
+	{
+		uint16_t L = 0;
+		uint32_t a = 1;
+		uint32_t d = 3;
+		while (a <= y)
 		{
-			const uint32_t temp = ((sqrti << 1) | bit) << shift--;
-			if (value >= temp)
-			{
-				value -= temp;
-				sqrti |= bit;
-			}
-			bit >>= 1;
+			a += d;	// (a + 1) ^ 2
+			d += 2;
+			L += 1;
 		}
-		return sqrti;
+		return L;
 	}
 
 	bool UI_DisplayAudioBar(const bool now)
 	{
-		if (g_current_function != FUNCTION_TRANSMIT || g_screen_to_display != DISPLAY_MAIN)
+		if (g_current_function != FUNCTION_TRANSMIT || g_current_display_screen != DISPLAY_MAIN)
 			return false;
 
-		if (center_line != CENTER_LINE_NONE && center_line != CENTER_LINE_AUDIO_BAR)
+		if (g_center_line != CENTER_LINE_NONE && g_center_line != CENTER_LINE_AUDIO_BAR)
 			return false;
 
 		if (g_dtmf_call_state != DTMF_CALL_STATE_NONE)
@@ -195,7 +191,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 			const unsigned int txt_width = 7 * 3;                 // 3 text chars
 			const unsigned int bar_x     = 2 + txt_width + 4;     // X coord of bar graph
 			const unsigned int bar_width = LCD_WIDTH - 1 - bar_x;
-			const unsigned int secs      = g_tx_timer_count_down_500ms / 2;
+			const unsigned int secs      = g_tx_timer_tick_500ms / 2;
 			uint8_t           *p_line    = g_frame_buffer[line];
 			char               s[16];
 
@@ -220,7 +216,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 
 				// make non-linear to make more sensitive at low values
 				const unsigned int level      = voice_amp * 8;
-				const unsigned int sqrt_level = sqrt16((level < 65535) ? level : 65535);
+				const unsigned int sqrt_level = isqrt((level < 65535) ? level : 65535);
 				const unsigned int len        = (sqrt_level <= bar_width) ? sqrt_level : bar_width;
 
 				draw_bar(p_line + bar_x, len, bar_width);
@@ -269,7 +265,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 			#endif
 
 			if (g_current_function == FUNCTION_TRANSMIT ||
-				g_screen_to_display != DISPLAY_MAIN ||
+				g_current_display_screen != DISPLAY_MAIN ||
 				g_dtmf_call_state != DTMF_CALL_STATE_NONE)
 				return false;     // display is in use
 
@@ -304,7 +300,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 void UI_update_rssi(const int16_t rssi, const int vfo)
 {
 #ifdef ENABLE_RX_SIGNAL_BAR
-	if (center_line == CENTER_LINE_RSSI)
+	if (g_center_line == CENTER_LINE_RSSI)
 	{	// optional larger RSSI dBm, S-point and bar level
 		if (g_current_function == FUNCTION_RECEIVE || g_current_function == FUNCTION_MONITOR)
 		{
@@ -378,7 +374,7 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 			return;    // display is in use
 		#endif
 
-		if (g_current_function == FUNCTION_TRANSMIT || g_screen_to_display != DISPLAY_MAIN)
+		if (g_current_function == FUNCTION_TRANSMIT || g_current_display_screen != DISPLAY_MAIN)
 			return;    // display is in use
 
 		p_line = g_frame_buffer[Line - 1];
@@ -434,7 +430,7 @@ void UI_DisplayMain(void)
 	char               str[22];
 	unsigned int       vfo_num;
 
-	center_line = CENTER_LINE_NONE;
+	g_center_line = CENTER_LINE_NONE;
 
 //	#ifdef SINGLE_VFO_CHAN
 //		const bool single_vfo = (g_eeprom.dual_watch == DUAL_WATCH_OFF && g_eeprom.cross_vfo_rx_tx == CROSS_BAND_OFF) ? true : false;
@@ -445,7 +441,7 @@ void UI_DisplayMain(void)
 	// clear the screen
 	memset(g_frame_buffer, 0, sizeof(g_frame_buffer));
 
-	if (g_serial_config_count_down_500ms > 0)
+	if (g_serial_config_tick_500ms > 0)
 	{
 		backlight_turn_on(10);		// 5 seconds
 		UI_PrintString("UART", 0, LCD_WIDTH, 1, 8);
@@ -548,7 +544,7 @@ void UI_DisplayMain(void)
 				str[16] = 0;
 				UI_PrintString(str, 2, 0, 2 + (vfo_num * 3), 8);
 
-				center_line = CENTER_LINE_IN_USE;
+				g_center_line = CENTER_LINE_IN_USE;
 				continue;
 			}
 
@@ -665,7 +661,7 @@ void UI_DisplayMain(void)
 		{	// user entering a frequency
 			UI_DisplayFrequency(g_input_box, 32, line, true, false);
 
-//			center_line = CENTER_LINE_IN_USE;
+//			g_center_line = CENTER_LINE_IN_USE;
 		}
 		else
 		{
@@ -681,8 +677,6 @@ void UI_DisplayMain(void)
 
 			if (g_eeprom.screen_channel[vfo_num] <= USER_CHANNEL_LAST)
 			{	// it's a channel
-				#pragma GCC diagnostic push
-				#pragma GCC diagnostic ignored "-Wimplicit-fallthrough="
 
 				switch (g_eeprom.channel_display_mode)
 				{
@@ -741,8 +735,6 @@ void UI_DisplayMain(void)
 
 						break;
 				}
-
-				#pragma GCC diagnostic pop
 			}
 			else
 //			if (IS_FREQ_CHANNEL(g_eeprom.screen_channel[vfo_num]))
@@ -906,7 +898,9 @@ void UI_DisplayMain(void)
 			UI_PrintStringSmall("SCR", LCD_WIDTH + 106, 0, line + 1);
 	}
 
-	if (center_line == CENTER_LINE_NONE)
+	if (g_center_line == CENTER_LINE_NONE &&
+		g_current_display_screen == DISPLAY_MAIN &&
+		g_dtmf_call_state == DTMF_CALL_STATE_NONE)
 	{	// we're free to use the middle line
 
 		const bool rx = (g_current_function == FUNCTION_RECEIVE ||
@@ -917,7 +911,7 @@ void UI_DisplayMain(void)
 			// show the TX timeout count down
 			if (UI_DisplayTXCountdown(false))
 			{
-				center_line = CENTER_LINE_TX_TIMEOUT;
+				g_center_line = CENTER_LINE_TX_TIMEOUT;
 			}
 			else
 		#endif
@@ -926,7 +920,21 @@ void UI_DisplayMain(void)
 			// show the TX audio level
 			if (UI_DisplayAudioBar(false))
 			{
-				center_line = CENTER_LINE_AUDIO_BAR;
+				g_center_line = CENTER_LINE_AUDIO_BAR;
+			}
+			else
+		#endif
+
+		#ifdef ENABLE_MDC1200
+			if (mdc1200_rx_ready_tick_500ms > 0)
+			{
+				g_center_line = CENTER_LINE_MDC1200;
+				sprintf(str, "MDC1200 %02X %02X %04X", mdc1200_op, mdc1200_arg, mdc1200_unit_id);
+				#ifdef ENABLE_SMALL_BOLD
+					UI_PrintStringSmallBold(str, 2, 0, 3);
+				#else
+					UI_PrintStringSmall(str, 2, 0, 3);
+				#endif
 			}
 			else
 		#endif
@@ -935,10 +943,7 @@ void UI_DisplayMain(void)
 			// show the AM-FIX debug data
 			if (rx && g_eeprom.vfo_info[g_eeprom.rx_vfo].am_mode && g_setting_am_fix)
 			{
-				if (g_screen_to_display != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
-					return;
-
-				center_line = CENTER_LINE_AM_FIX_DATA;
+				g_center_line = CENTER_LINE_AM_FIX_DATA;
 				AM_fix_print_data(g_eeprom.rx_vfo, str);
 				UI_PrintStringSmall(str, 2, 0, 3);
 			}
@@ -949,7 +954,7 @@ void UI_DisplayMain(void)
 			// show the RX RSSI dBm, S-point and signal strength bar graph
 			if (rx && g_setting_rssi_bar)
 			{
-				center_line = CENTER_LINE_RSSI;
+				g_center_line = CENTER_LINE_RSSI;
 				UI_DisplayRSSIBar(g_current_rssi[g_eeprom.rx_vfo], false);
 			}
 			else
@@ -963,10 +968,10 @@ void UI_DisplayMain(void)
 					const unsigned int len = strlen(g_dtmf_rx_live);
 					const unsigned int idx = (len > (17 - 5)) ? len - (17 - 5) : 0;  // limit to last 'n' chars
 
-					if (g_screen_to_display != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
+					if (g_current_display_screen != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
 						return;
 
-					center_line = CENTER_LINE_DTMF_DEC;
+					g_center_line = CENTER_LINE_DTMF_DEC;
 
 					strcpy(str, "DTMF ");
 					strcat(str, g_dtmf_rx_live + idx);
@@ -978,10 +983,10 @@ void UI_DisplayMain(void)
 					const unsigned int len = g_dtmf_rx_index;
 					const unsigned int idx = (len > (17 - 5)) ? len - (17 - 5) : 0;  // limit to last 'n' chars
 
-					if (g_screen_to_display != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
+					if (g_current_display_screen != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
 						return;
 
-					center_line = CENTER_LINE_DTMF_DEC;
+					g_center_line = CENTER_LINE_DTMF_DEC;
 
 					strcpy(str, "DTMF ");
 					strcat(str, g_dtmf_rx + idx);
@@ -993,10 +998,10 @@ void UI_DisplayMain(void)
 				else
 				if (g_charging_with_type_c)
 				{	// show the battery charge state
-					if (g_screen_to_display != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
+					if (g_current_display_screen != DISPLAY_MAIN || g_dtmf_call_state != DTMF_CALL_STATE_NONE)
 						return;
 
-					center_line = CENTER_LINE_CHARGE_DATA;
+					g_center_line = CENTER_LINE_CHARGE_DATA;
 
 					sprintf(str, "Charge %u.%02uV %u%%",
 						g_battery_voltage_average / 100, g_battery_voltage_average % 100,

@@ -43,16 +43,29 @@ static void ACTION_FlashLight(void)
 {
 	switch (g_flash_light_state)
 	{
-		case 0:
-			g_flash_light_state++;
+		case FLASHLIGHT_OFF:
+			g_flash_light_state = FLASHLIGHT_ON;
 			GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
 			break;
-		case 1:
-			g_flash_light_state++;
+
+		case FLASHLIGHT_ON:
+			g_flash_light_state = FLASHLIGHT_BLINK;
 			break;
-		default:
-			g_flash_light_state = 0;
+
+		case FLASHLIGHT_BLINK:
+			g_flash_light_blink_tick_10ms = 0;
 			GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
+			g_flash_light_state = FLASHLIGHT_SOS;
+			break;
+
+		case FLASHLIGHT_SOS:
+
+		// Fallthrough
+
+		default:
+			g_flash_light_state = FLASHLIGHT_OFF;
+			GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
+			break;
 	}
 }
 
@@ -71,7 +84,7 @@ void ACTION_Power(void)
 		g_another_voice_id = VOICE_ID_POWER;
 	#endif
 
-	g_request_display_screen = g_screen_to_display;
+	g_request_display_screen = g_current_display_screen;
 }
 
 void ACTION_Monitor(void)
@@ -97,7 +110,7 @@ void ACTION_Monitor(void)
 	#ifdef g_power_save_expired
 		if (g_eeprom.dual_watch == DUAL_WATCH_OFF && g_is_noaa_mode)
 		{
-			g_noaa_count_down_10ms = noaa_count_down_10ms;
+			g_noaa_tick_10ms = noaa_tick_10ms;
 			g_schedule_noaa        = false;
 		}
 	#endif
@@ -112,7 +125,7 @@ void ACTION_Monitor(void)
 		}
 		else
 	#endif
-			g_request_display_screen = g_screen_to_display;
+			g_request_display_screen = g_current_display_screen;
 }
 
 void ACTION_Scan(bool bRestart)
@@ -169,7 +182,7 @@ void ACTION_Scan(bool bRestart)
 		}
 	#endif
 
-	if (g_screen_to_display != DISPLAY_SEARCH)
+	if (g_current_display_screen != DISPLAY_SEARCH)
 	{	// not in freq/ctcss/cdcss search mode
 
 		g_monitor_enabled = false;
@@ -302,7 +315,7 @@ void ACTION_Scan(bool bRestart)
 
 		g_flag_prepare_tx = true;
 
-		if (g_screen_to_display != DISPLAY_MENU)     // 1of11 .. don't close the menu
+		if (g_current_display_screen != DISPLAY_MENU)     // 1of11 .. don't close the menu
 			g_request_display_screen = DISPLAY_MAIN;
 	}
 #endif

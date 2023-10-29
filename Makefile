@@ -12,12 +12,13 @@ ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 # UART Programming 2.9 kB
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 0
+ENABLE_UART_DEBUG                := 1
 # AirCopy 2.5 kB
 ENABLE_AIRCOPY                   := 0
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1
 ENABLE_AIRCOPY_RX_REBOOT         := 0
 # FM Radio 4.2 kB
+ENABLE_FMRADIO_64_76             := 0
 ENABLE_FMRADIO_76_90             := 0
 ENABLE_FMRADIO_68_108            := 1
 ENABLE_FMRADIO_76_108            := 0
@@ -33,7 +34,7 @@ ENABLE_REDUCE_LOW_MID_TX_POWER   := 1
 # Tx Alarm 0.6 kB
 ENABLE_ALARM                     := 0
 ENABLE_TX1750                    := 0
-# MDC1200 0.892 kB
+# MDC1200 2.8 kB
 ENABLE_MDC1200                   := 1
 ENABLE_PWRON_PASSWORD            := 0
 ENABLE_RESET_AES_KEY             := 0
@@ -66,11 +67,11 @@ ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS  := 1
 ENABLE_FASTER_CHANNEL_SCAN       := 1
 ENABLE_COPY_CHAN_TO_VFO_TO_CHAN  := 1
 # Rx Signal Bar 0.4 kB
-ENABLE_RX_SIGNAL_BAR             := 1
+ENABLE_RX_SIGNAL_BAR             := 0
 # Tx Timeout Bar 0.2 kB
 ENABLE_TX_TIMEOUT_BAR            := 0
 # Tx Audio Bar 0.3 kB
-ENABLE_TX_AUDIO_BAR              := 0
+ENABLE_TX_AUDIO_BAR              := 1
 # Side Button Menu 0.3 kB
 ENABLE_SIDE_BUTT_MENU            := 1
 # Key Lock 0.4 kB
@@ -105,7 +106,7 @@ ifeq ($(ENABLE_LTO),1)
 	ENABLE_OVERLAY := 0
 endif
 
-ifeq ($(filter $(ENABLE_FMRADIO_76_90) $(ENABLE_FMRADIO_68_108) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
+ifeq ($(filter $(ENABLE_FMRADIO_64_76) $(ENABLE_FMRADIO_76_90) $(ENABLE_FMRADIO_76_108) $(ENABLE_FMRADIO_875_108), 1), 1)
 	ENABLE_FMRADIO := 1
 else
 	ENABLE_FMRADIO := 0
@@ -295,11 +296,11 @@ endif
 ifeq ($(ENABLE_AIRCOPY_RX_REBOOT),1)
 	CFLAGS += -DENABLE_AIRCOPY_RX_REBOOT
 endif
+ifeq ($(ENABLE_FMRADIO_64_76),1)
+	CFLAGS += -DENABLE_FMRADIO_64_76
+endif
 ifeq ($(ENABLE_FMRADIO_76_90),1)
 	CFLAGS += -DENABLE_FMRADIO_76_90
-endif
-ifeq ($(ENABLE_FMRADIO_68_108),1)
-	CFLAGS += -DENABLE_FMRADIO_68_108
 endif
 ifeq ($(ENABLE_FMRADIO_76_108),1)
 	CFLAGS += -DENABLE_FMRADIO_76_108

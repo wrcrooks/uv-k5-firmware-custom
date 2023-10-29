@@ -68,7 +68,7 @@
 	voice_id_t        g_voice_id[8];
 	uint8_t           g_voice_read_index;
 	uint8_t           g_voice_write_index;
-	volatile uint16_t g_count_down_to_play_next_voice_10ms;
+	volatile uint16_t g_tick_to_play_next_voice_10ms;
 	volatile bool     g_flag_play_queued_voice;
 	voice_id_t        g_another_voice_id = VOICE_ID_INVALID;
 
@@ -95,7 +95,7 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 	}
 
 	#ifdef ENABLE_AIRCOPY
-//		if (g_screen_to_display == DISPLAY_AIRCOPY || g_aircopy_state != AIRCOPY_READY)
+//		if (g_current_display_screen == DISPLAY_AIRCOPY || g_aircopy_state != AIRCOPY_READY)
 //				return;
 	#endif
 	if (g_current_function == FUNCTION_RECEIVE || g_current_function == FUNCTION_MONITOR)
@@ -156,9 +156,6 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 
 	SYSTEM_DelayMs(60);
 
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wimplicit-fallthrough="
-
 	switch (Beep)
 	{
 		case BEEP_880HZ_60MS_TRIPLE_BEEP:
@@ -167,12 +164,16 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 			BK4819_EnterTxMute();
 			SYSTEM_DelayMs(20);
 
+			// Fallthrough
+
 		case BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL:
 		case BEEP_500HZ_60MS_DOUBLE_BEEP:
 			BK4819_ExitTxMute();
 			SYSTEM_DelayMs(60);
 			BK4819_EnterTxMute();
 			SYSTEM_DelayMs(20);
+
+			// Fallthrough
 
 		case BEEP_1KHZ_60MS_OPTIONAL:
 			BK4819_ExitTxMute();
@@ -197,8 +198,6 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 			Duration = 500;
 			break;
 	}
-
-	#pragma GCC diagnostic pop
 
 	SYSTEM_DelayMs(Duration);
 
@@ -338,7 +337,7 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 		}
 
 		g_voice_read_index                   = 1;
-		g_count_down_to_play_next_voice_10ms = Delay;
+		g_tick_to_play_next_voice_10ms = Delay;
 		g_flag_play_queued_voice             = false;
 
 		return;
@@ -450,7 +449,7 @@ void AUDIO_PlayBeep(beep_type_t Beep)
 
 				AUDIO_PlayVoice(VoiceID);
 
-				g_count_down_to_play_next_voice_10ms = Delay;
+				g_tick_to_play_next_voice_10ms = Delay;
 				g_flag_play_queued_voice           = false;
 
 				#ifdef ENABLE_VOX
