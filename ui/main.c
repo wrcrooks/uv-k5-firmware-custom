@@ -302,7 +302,7 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 #ifdef ENABLE_RX_SIGNAL_BAR
 	if (g_center_line == CENTER_LINE_RSSI)
 	{	// optional larger RSSI dBm, S-point and bar level
-		if (g_current_function == FUNCTION_RECEIVE || g_current_function == FUNCTION_MONITOR)
+		if (g_current_function == FUNCTION_RECEIVE && g_squelch_open)
 		{
 			UI_DisplayRSSIBar(rssi, true);
 		}
@@ -355,9 +355,7 @@ void UI_update_rssi(const int16_t rssi, const int vfo)
 		if (rssi >= level01)
 			rssi_level = 2;
 		else
-		if (rssi >= level0 ||
-		    g_current_function == FUNCTION_MONITOR ||
-		    g_current_function == FUNCTION_NEW_RECEIVE)
+		if (rssi >= level0 || g_current_function == FUNCTION_NEW_RECEIVE)
 		{
 			rssi_level = 1;
 		}
@@ -422,7 +420,7 @@ void big_freq(const uint32_t frequency, const unsigned int x, const unsigned int
 
 void UI_DisplayMain(void)
 {
-	#ifndef ENABLE_BIG_FREQ
+	#if !defined(ENABLE_BIG_FREQ) && defined(ENABLE_SMALLEST_FONT)
 		const unsigned int smallest_char_spacing = ARRAY_SIZE(g_font3x5[0]) + 1;
 	#endif
 	const unsigned int line0 = 0;  // text screen line
@@ -589,10 +587,7 @@ void UI_DisplayMain(void)
 		else
 		{	// receiving .. show the RX symbol
 			mode = 2;
-			if ((g_current_function == FUNCTION_RECEIVE ||
-			     g_current_function == FUNCTION_MONITOR ||
-			     g_current_function == FUNCTION_NEW_RECEIVE) &&
-			     g_eeprom.rx_vfo == vfo_num)
+			if ((g_current_function == FUNCTION_RECEIVE && g_squelch_open) && g_eeprom.rx_vfo == vfo_num)
 			{
 				#ifdef ENABLE_SMALL_BOLD
 					UI_PrintStringSmallBold("RX", 14, 0, line);
@@ -776,7 +771,7 @@ void UI_DisplayMain(void)
 
 				// no room for these symbols
 
-			#else
+			#elif defined(ENABLE_SMALLEST_FONT)
 			{
 				unsigned int x = LCD_WIDTH + LCD_WIDTH - 1 - (smallest_char_spacing * 1) - (smallest_char_spacing * 4);
 
@@ -794,6 +789,24 @@ void UI_DisplayMain(void)
 				if (g_eeprom.vfo_info[vfo_num].compand)
 					UI_PrintStringSmallest("C", x, (line + 0) * 8, false, true);
 				//x += smallest_char_spacing * 1;
+			}
+			#else
+			{
+				strcpy(str, "  ");
+				
+				if (IS_FREQ_CHANNEL(g_eeprom.screen_channel[vfo_num]))
+				{
+					//g_eeprom.vfo_info[vfo_num].freq_in_channel = BOARD_find_channel(frequency);
+					if (g_eeprom.vfo_info[vfo_num].freq_in_channel <= USER_CHANNEL_LAST)
+					{	// the channel number that contains this VFO frequency
+						str[0] = 'F';
+					}
+				}
+
+				if (g_eeprom.vfo_info[vfo_num].compand)
+					str[1] = 'C';
+				
+				UI_PrintStringSmall(str, LCD_WIDTH - 1 - (6 * 2), 0, line + 1);
 			}
 			#endif
 		}
@@ -815,11 +828,8 @@ void UI_DisplayMain(void)
 			else
 			if (mode == 2)
 			{	// RX signal level
-				//#ifndef ENABLE_RX_SIGNAL_BAR
-					// antenna bar graph
-					if (g_vfo_rssi_bar_level[vfo_num] > 0)
-						Level = g_vfo_rssi_bar_level[vfo_num];
-				//#endif
+				if (g_vfo_rssi_bar_level[vfo_num] > 0)
+					Level = g_vfo_rssi_bar_level[vfo_num];
 			}
 
 			UI_drawBars(p_line1 + LCD_WIDTH, Level);
@@ -828,9 +838,16 @@ void UI_DisplayMain(void)
 		// ************
 
 		str[0] = '\0';
-		if (g_eeprom.vfo_info[vfo_num].am_mode)
-		{	// show the AM symbol
-			strcpy(str, "AM");
+		if (g_eeprom.vfo_info[vfo_num].am_mode > 0)
+		{
+			//strcpy(str, g_sub_menu_mod_mode[g_eeprom.vfo_info[vfo_num].am_mode]);
+			switch (g_eeprom.vfo_info[vfo_num].am_mode)
+			{
+				default:
+				case 0: strcpy(str, "FM"); break;
+				case 1: strcpy(str, "AM"); break;
+				case 2: strcpy(str, "DS"); break;
+			}
 		}
 		else
 		{	// or show the CTCSS/DCS symbol
@@ -845,7 +862,7 @@ void UI_DisplayMain(void)
 		#ifdef ENABLE_TX_WHEN_AM
 			if (state == VFO_STATE_NORMAL || state == VFO_STATE_ALARM)
 		#else
-			if ((state == VFO_STATE_NORMAL || state == VFO_STATE_ALARM) && !g_eeprom.vfo_info[vfo_num].am_mode) // not allowed to TX if in AM mode
+			if ((state == VFO_STATE_NORMAL || state == VFO_STATE_ALARM) && g_eeprom.vfo_info[vfo_num].am_mode == 0) // not allowed to TX if not in FM mode
 		#endif
 		{
 			if (FREQUENCY_tx_freq_check(g_eeprom.vfo_info[vfo_num].p_tx->frequency) == 0)
@@ -903,9 +920,7 @@ void UI_DisplayMain(void)
 		g_dtmf_call_state == DTMF_CALL_STATE_NONE)
 	{	// we're free to use the middle line
 
-		const bool rx = (g_current_function == FUNCTION_RECEIVE ||
-		                 g_current_function == FUNCTION_MONITOR ||
-		                 g_current_function == FUNCTION_NEW_RECEIVE);
+		const bool rx = (g_current_function == FUNCTION_RECEIVE && g_squelch_open) ? true : false;
 
 		#ifdef ENABLE_TX_TIMEOUT_BAR
 			// show the TX timeout count down
@@ -941,7 +956,7 @@ void UI_DisplayMain(void)
 
 		#if defined(ENABLE_AM_FIX) && defined(ENABLE_AM_FIX_SHOW_DATA)
 			// show the AM-FIX debug data
-			if (rx && g_eeprom.vfo_info[g_eeprom.rx_vfo].am_mode && g_setting_am_fix)
+			if (rx && g_eeprom.vfo_info[g_eeprom.rx_vfo].am_mode > 0 && g_setting_am_fix)
 			{
 				g_center_line = CENTER_LINE_AM_FIX_DATA;
 				AM_fix_print_data(g_eeprom.rx_vfo, str);
