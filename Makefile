@@ -12,7 +12,7 @@ ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 # UART Programming 2.9 kB
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 1
+ENABLE_UART_DEBUG                := 0
 # AirCopy 2.5 kB
 ENABLE_AIRCOPY                   := 0
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 1
@@ -67,7 +67,7 @@ ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS  := 1
 ENABLE_FASTER_CHANNEL_SCAN       := 1
 ENABLE_COPY_CHAN_TO_VFO_TO_CHAN  := 1
 # Rx Signal Bar 0.4 kB
-ENABLE_RX_SIGNAL_BAR             := 0
+ENABLE_RX_SIGNAL_BAR             := 1
 # Tx Timeout Bar 0.2 kB
 ENABLE_TX_TIMEOUT_BAR            := 0
 # Tx Audio Bar 0.3 kB
