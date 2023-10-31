@@ -14,9 +14,6 @@
  *     limitations under the License.
  */
 
-#include <string.h>
-#include <stdlib.h>  // abs()
-
 #ifdef ENABLE_AM_FIX
 	#include "am_fix.h"
 #endif
@@ -1869,6 +1866,19 @@ void APP_time_slice_500ms(void)
 		}
 	}
 
+	if (g_update_screen_tick_500ms > 0)
+	{	// update display once every 500ms
+		if (--g_update_screen_tick_500ms == 0)
+		{
+			RADIO_set_vfo_state(VFO_STATE_NORMAL);
+
+			g_update_status  = true;
+			g_update_display = true;
+		}
+		//g_update_status  = true;
+		//g_update_display = true;
+	}
+
 	#ifdef ENABLE_MDC1200
 		if (mdc1200_rx_ready_tick_500ms > 0)
 		{
@@ -1899,6 +1909,12 @@ void APP_time_slice_500ms(void)
 		}
 	}
 
+	#ifdef ENABLE_TX_TIMEOUT_BAR
+		if (g_current_function == FUNCTION_TRANSMIT && g_tx_timer_tick_500ms & 1u))
+			g_update_display = true;
+//			UI_DisplayTXCountdown(true);
+	#endif
+
 	if (g_menu_tick_10ms > 0)
 		if (--g_menu_tick_10ms == 0)
 			exit_menu = (g_current_display_screen == DISPLAY_MENU);	// exit menu mode
@@ -1911,8 +1927,8 @@ void APP_time_slice_500ms(void)
 		if (g_fm_radio_tick_500ms > 0)
 			g_fm_radio_tick_500ms--;
 
-		if (g_fm_radio_mode && g_current_display_screen == DISPLAY_FM && g_fm_scan_state_dir != FM_SCAN_STATE_DIR_OFF)
-			g_update_display = true;  // can't do this if not FM scanning, it causes audio clicks
+//		if (g_fm_radio_mode && g_current_display_screen == DISPLAY_FM && g_fm_scan_state_dir != FM_SCAN_STATE_DIR_OFF)
+//			g_update_display = true;  // can't do this if not FM scanning, it causes audio clicks
 	#endif
 
 	if (g_backlight_count_down > 0 &&
@@ -2116,18 +2132,21 @@ void APP_time_slice_500ms(void)
 		{
 			if (g_fm_resume_tick_500ms > 0)
 			{
-				if (--g_fm_resume_tick_500ms == 0)
+				if (g_fm_radio_mode)
 				{
-					RADIO_set_vfo_state(VFO_STATE_NORMAL);
-
-					if (g_current_function != FUNCTION_RECEIVE &&
-						!g_monitor_enabled &&
-						g_fm_radio_mode)
-					{	// switch back to FM radio mode
-						FM_turn_on();
-						GUI_SelectNextDisplay(DISPLAY_FM);
+					if (--g_fm_resume_tick_500ms == 0)
+					{
+						if (g_current_function != FUNCTION_RECEIVE && g_fm_radio_mode)
+						{	// switch back to FM radio mode
+							if (g_current_display_screen != DISPLAY_FM)
+								FM_turn_on();
+							//GUI_SelectNextDisplay(DISPLAY_FM);
+						}
 					}
+					GUI_SelectNextDisplay(DISPLAY_FM);
 				}
+				else
+					FM_turn_off();
 			}
 		}
 
@@ -2186,11 +2205,6 @@ void APP_time_slice_500ms(void)
 			g_update_display = true;
 		}
 	}
-
-	#ifdef ENABLE_TX_TIMEOUT_BAR
-		if (g_current_function == FUNCTION_TRANSMIT && (g_tx_timer_tick_500ms & 1u))
-			UI_DisplayTXCountdown(true);
-	#endif
 }
 
 void APP_time_slice_10ms(void)

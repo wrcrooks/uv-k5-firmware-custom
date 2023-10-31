@@ -14,8 +14,6 @@
  *     limitations under the License.
  */
 
-#include <string.h>
-
 #include "app/app.h"
 #include "app/dtmf.h"
 #ifdef ENABLE_FMRADIO
@@ -965,10 +963,6 @@ void RADIO_set_vfo_state(vfo_state_t State)
 	{
 		g_vfo_state[0] = VFO_STATE_NORMAL;
 		g_vfo_state[1] = VFO_STATE_NORMAL;
-
-		#ifdef ENABLE_FMRADIO
-			g_fm_resume_tick_500ms = 0;
-		#endif
 	}
 	else
 	{
@@ -983,9 +977,8 @@ void RADIO_set_vfo_state(vfo_state_t State)
 			g_vfo_state[vfo] = State;
 		}
 
-		#ifdef ENABLE_FMRADIO
-			g_fm_resume_tick_500ms = fm_resume_500ms;
-		#endif
+		// cause a display update to remove the message
+		g_update_screen_tick_500ms = 8;    // 4 seconds
 	}
 
 	g_update_display = true;

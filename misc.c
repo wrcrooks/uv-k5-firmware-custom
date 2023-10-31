@@ -14,8 +14,6 @@
  *     limitations under the License.
  */
 
-#include <string.h>
-
 #include "misc.h"
 #include "settings.h"
 
@@ -158,6 +156,8 @@ volatile uint16_t     g_tail_tone_elimination_tick_10ms;
 #ifdef ENABLE_NOAA
 	volatile uint16_t g_noaa_tick_10ms;
 #endif
+
+uint8_t               g_update_screen_tick_500ms;
 
 uint8_t               g_key_input_count_down;
 #ifdef ENABLE_KEYLOCK
