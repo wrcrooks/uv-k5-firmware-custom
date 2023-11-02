@@ -12,7 +12,7 @@ ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 # UART Programming 2.9 kB
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 1
+ENABLE_UART_DEBUG                := 0
 # AirCopy 2.5 kB
 ENABLE_AIRCOPY                   := 0
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 0
@@ -30,7 +30,7 @@ ENABLE_NOAA                      := 0
 ENABLE_VOICE                     := 0
 ENABLE_MUTE_RADIO_FOR_VOICE      := 0
 # Tx on Voice 1.0 kB
-ENABLE_VOX                       := 0
+ENABLE_VOX                       := 1
 ENABLE_REDUCE_LOW_MID_TX_POWER   := 1
 # Tx Alarm 600 B
 ENABLE_ALARM                     := 0
@@ -60,8 +60,8 @@ ENABLE_DTMF_CALL_FLASH_LIGHT     := 1
 ENABLE_FLASH_LIGHT_SOS_TONE      := 1
 ENABLE_SHOW_CHARGE_LEVEL         := 1
 ENABLE_REVERSE_BAT_SYMBOL        := 1
-ENABLE_FREQ_SEARCH_TIMEOUT       := 1
-ENABLE_CODE_SEARCH_TIMEOUT       := 1
+ENABLE_FREQ_SEARCH_TIMEOUT       := 0
+ENABLE_CODE_SEARCH_TIMEOUT       := 0
 # Kill and Revive 400 B
 ENABLE_KILL_REVIVE               := 0
 # AM Fix 800 B
@@ -77,9 +77,9 @@ ENABLE_RX_SIGNAL_BAR             := 0
 # Tx Timeout Bar 200 B
 ENABLE_TX_TIMEOUT_BAR            := 0
 # Tx Audio Bar 300 B
-ENABLE_TX_AUDIO_BAR              := 1
+ENABLE_TX_AUDIO_BAR              := 0
 # Side Button Menu 300 B
-ENABLE_SIDE_BUTT_MENU            := 1
+ENABLE_SIDE_BUTT_MENU            := 0
 # Key Lock 400 B
 ENABLE_KEYLOCK                   := 0
 #ENABLE_PANADAPTER               := 0
@@ -225,7 +225,6 @@ OBJS += ui/menu.o
 OBJS += ui/search.o
 OBJS += ui/status.o
 OBJS += ui/ui.o
-OBJS += ui/welcome.o
 OBJS += version.o
 OBJS += main.o
 
