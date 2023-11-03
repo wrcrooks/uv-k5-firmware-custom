@@ -50,6 +50,9 @@
 #include "dtmf.h"
 #include "external/printf/printf.h"
 #include "frequencies.h"
+#ifdef ENABLE_SCAN_IGNORE_LIST
+	#include "freq_ignore.h"
+#endif
 #include "functions.h"
 #include "helper/battery.h"
 #ifdef ENABLE_MDC1200
@@ -533,9 +536,12 @@ bool APP_start_listening(void)
 			(g_eeprom.calib.dac_gain    << 0));     // AF DAC Gain (after Gain-1 and Gain-2)
 	}
 
-	FUNCTION_Select(FUNCTION_RECEIVE);
+	#ifdef ENABLE_FMRADIO
+		if (g_fm_radio_mode)
+			BK1080_Init(0, false);		// disable the FM radio audio
+	#endif
 
-	GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
+	FUNCTION_Select(FUNCTION_RECEIVE);
 
 	#ifdef ENABLE_VOICE
 		#ifdef MUTE_AUDIO_FOR_VOICE
@@ -548,10 +554,7 @@ bool APP_start_listening(void)
 		AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
 	#endif
 
-	#ifdef ENABLE_FMRADIO
-		if (g_fm_radio_mode)
-			BK1080_Init(0, false);		// disable the FM radio audio
-	#endif
+	GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 
 	if (g_current_display_screen != DISPLAY_MENU)
 		GUI_SelectNextDisplay(DISPLAY_MAIN);
@@ -668,12 +671,27 @@ void APP_stop_scan(void)
 static void APP_next_freq(void)
 {
 	frequency_band_t       new_band;
-	const frequency_band_t old_band  = FREQUENCY_GetBand(g_rx_vfo->freq_config_rx.frequency);
-	const uint32_t         frequency = APP_set_frequency_by_step(g_rx_vfo, g_scan_state_dir);
+	const frequency_band_t old_band = FREQUENCY_GetBand(g_rx_vfo->freq_config_rx.frequency);
+
+	uint32_t frequency = APP_set_frequency_by_step(g_rx_vfo, g_scan_state_dir);
+	g_rx_vfo->freq_config_rx.frequency = frequency;
+
+	#ifdef ENABLE_SCAN_IGNORE_LIST
+		while (FI_freq_ignored(frequency) >= 0)
+		{
+			uint32_t next_frequency;
+			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+//				UART_printf("skipping %u\r\n", frequency);
+			#endif
+			next_frequency = APP_set_frequency_by_step(g_rx_vfo, g_scan_state_dir); // skip to next frequency
+			if (frequency == next_frequency)
+				break;
+			frequency = next_frequency;
+			g_rx_vfo->freq_config_rx.frequency = frequency;
+		}
+	#endif
 
 	new_band = FREQUENCY_GetBand(frequency);
-
-	g_rx_vfo->freq_config_rx.frequency = frequency;
 
 	g_rx_vfo->freq_in_channel = 0xff;
 
@@ -682,7 +700,7 @@ static void APP_next_freq(void)
 	#endif
 
 	if (new_band != old_band)
-	{	// original slow method
+	{	// original slower method
 
 		RADIO_ApplyOffset(g_rx_vfo, false);
 		RADIO_ConfigureSquelchAndOutputPower(g_rx_vfo);
@@ -848,8 +866,8 @@ static bool APP_toggle_dual_watch_vfo(void)
 	if (g_dtmf_call_state != DTMF_CALL_STATE_NONE)
 		return false;
 	#ifdef ENABLE_FMRADIO
-//		if (g_fm_radio_mode)
-//			return false;
+		if (g_fm_radio_mode)
+			return false;
 	#endif
 	if (g_dual_watch_tick_10ms > 0)
 		return false;
@@ -2195,8 +2213,10 @@ void APP_time_slice_500ms(void)
 						if (g_current_function != FUNCTION_RECEIVE && g_fm_radio_mode)
 						{	// switch back to FM radio mode
 							if (g_current_display_screen != DISPLAY_FM)
+							{
 								FM_turn_on();
-							//GUI_SelectNextDisplay(DISPLAY_FM);
+								GUI_SelectNextDisplay(DISPLAY_FM);
+							}
 						}
 					}
 					GUI_SelectNextDisplay(DISPLAY_FM);
