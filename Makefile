@@ -30,14 +30,14 @@ ENABLE_NOAA                      := 0
 ENABLE_VOICE                     := 0
 ENABLE_MUTE_RADIO_FOR_VOICE      := 0
 # Tx on Voice 1.0 kB
-ENABLE_VOX                       := 1
+ENABLE_VOX                       := 0
 ENABLE_VOX_MORE_SENSITIVE        := 1
 ENABLE_REDUCE_LOW_MID_TX_POWER   := 1
 # Tx Alarm 600 B
 ENABLE_ALARM                     := 0
 ENABLE_TX1750                    := 0
 # MDC1200 2.8 kB
-ENABLE_MDC1200                   := 0
+ENABLE_MDC1200                   := 1
 ENABLE_MDC1200_SHOW_OP_ARG       := 1
 ENABLE_PWRON_PASSWORD            := 0
 ENABLE_RESET_AES_KEY             := 0
@@ -78,7 +78,7 @@ ENABLE_RX_SIGNAL_BAR             := 0
 # Tx Audio Bar 300 B
 ENABLE_TX_AUDIO_BAR              := 0
 # Side Button Menu 300 B
-ENABLE_SIDE_BUTT_MENU            := 0
+ENABLE_SIDE_BUTT_MENU            := 1
 # Key Lock 400 B
 ENABLE_KEYLOCK                   := 0
 #ENABLE_PANADAPTER               := 0

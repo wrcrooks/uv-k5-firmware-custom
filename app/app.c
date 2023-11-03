@@ -83,7 +83,7 @@ static void APP_update_rssi(const int vfo)
 
 	#ifdef ENABLE_AM_FIX
 		// add RF gain adjust compensation
-		if (g_current_vfo->am_mode > 0 && g_eeprom.config.setting.am_fix)
+		if (g_current_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix)
 			rssi -= rssi_gain_diff[vfo];
 	#endif
 
@@ -214,9 +214,9 @@ static void APP_process_new_receive(void)
 	{	// not code scanning
 
 		#ifdef ENABLE_KILL_REVIVE
-			if (g_rx_vfo->dtmf_decoding_enable || g_eeprom.config.setting.radio_disabled)
+			if (g_rx_vfo->channel.dtmf_decoding_enable || g_eeprom.config.setting.radio_disabled)
 		#else
-			if (g_rx_vfo->dtmf_decoding_enable)
+			if (g_rx_vfo->channel.dtmf_decoding_enable)
 		#endif
 		{	// DTMF DCD is enabled
 
@@ -520,7 +520,7 @@ bool APP_start_listening(void)
 	}
 
 	// AF gain - original QS values
-//	if (g_rx_vfo->am_mode > 0)
+//	if (g_rx_vfo->channel.am_mode > 0)
 //	{
 //		BK4819_WriteRegister(0x48, 0xB3A8);   // 1011 0011 1010 1000
 //	}
@@ -540,12 +540,12 @@ bool APP_start_listening(void)
 	#ifdef ENABLE_VOICE
 		#ifdef MUTE_AUDIO_FOR_VOICE
 			if (g_voice_write_index == 0)
-				AUDIO_set_mod_mode(g_rx_vfo->am_mode);
+				AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
 		#else
-			AUDIO_set_mod_mode(g_rx_vfo->am_mode);
+			AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
 		#endif
 	#else
-		AUDIO_set_mod_mode(g_rx_vfo->am_mode);
+		AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
 	#endif
 
 	#ifdef ENABLE_FMRADIO
@@ -568,7 +568,7 @@ uint32_t APP_set_frequency_by_step(vfo_info_t *pInfo, int8_t Step)
 
 	if (pInfo->step_freq == 833)
 	{
-		const uint32_t Lower = FREQ_BAND_TABLE[pInfo->band].lower;
+		const uint32_t Lower = FREQ_BAND_TABLE[pInfo->channel_attributes.band].lower;
 		const uint32_t Delta = Frequency - Lower;
 		uint32_t       Base  = (Delta / 2500) * 2500;
 		const uint32_t Index = ((Delta - Base) % 2500) / 833;
@@ -579,12 +579,12 @@ uint32_t APP_set_frequency_by_step(vfo_info_t *pInfo, int8_t Step)
 		Frequency = Lower + Base + (Index * 833);
 	}
 
-//	if (Frequency >= FREQ_BAND_TABLE[pInfo->band].upper)
-//		Frequency =  FREQ_BAND_TABLE[pInfo->band].lower;
+//	if (Frequency >= FREQ_BAND_TABLE[pInfo->channel_attributes.band].upper)
+//		Frequency =  FREQ_BAND_TABLE[pInfo->channel_attributes.band].lower;
 //	else
-//	if (Frequency < FREQ_BAND_TABLE[pInfo->band].lower)
-//		Frequency = FREQUENCY_floor_to_step(FREQ_BAND_TABLE[pInfo->band].upper, pInfo->step_freq, FREQ_BAND_TABLE[pInfo->band].lower);
-	Frequency = FREQUENCY_wrap_to_step_band(Frequency, pInfo->step_freq, pInfo->band);
+//	if (Frequency < FREQ_BAND_TABLE[pInfo->channel_attributes.band].lower)
+//		Frequency = FREQUENCY_floor_to_step(FREQ_BAND_TABLE[pInfo->channel_attributes.band].upper, pInfo->step_freq, FREQ_BAND_TABLE[pInfo->channel_attributes.band].lower);
+	Frequency = FREQUENCY_wrap_to_step_band(Frequency, pInfo->step_freq, pInfo->channel_attributes.band);
 
 	return Frequency;
 }
@@ -908,16 +908,19 @@ void APP_process_radio_interrupts(void)
 		int_bits = BK4819_ReadRegister(0x02);
 
 		#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-		{
-			int i;
-			UART_printf("int bits %04X %04X ", reg_c, int_bits);
-			for (i = 15; i >= 0; i--)
-				UART_printf("%c", (reg_c & (1u << i)) ? '#' : '.');
-			UART_SendText("  ");
-			for (i = 15; i >= 0; i--)
-				UART_printf("%c", (int_bits & (1u << i)) ? '#' : '.');
-			UART_SendText("\r\n");
-		}
+			#ifdef ENABLE_AIRCOPY
+				if (g_current_display_screen != DISPLAY_AIRCOPY)
+			#endif
+				{
+					int i;
+					UART_printf("int bits %04X %04X ", reg_c, int_bits);
+					for (i = 15; i >= 0; i--)
+						UART_printf("%c", (reg_c & (1u << i)) ? '#' : '.');
+					UART_SendText("  ");
+					for (i = 15; i >= 0; i--)
+						UART_printf("%c", (int_bits & (1u << i)) ? '#' : '.');
+					UART_SendText("\r\n");
+				}
 		#endif
 
 		if (int_bits & BK4819_REG_02_DTMF_5TONE_FOUND)
@@ -940,9 +943,9 @@ void APP_process_radio_interrupts(void)
 				}
 
 				#ifdef ENABLE_KILL_REVIVE
-					if (g_rx_vfo->dtmf_decoding_enable || g_eeprom.config.setting.radio_disabled)
+					if (g_rx_vfo->channel.dtmf_decoding_enable || g_eeprom.config.setting.radio_disabled)
 				#else
-					if (g_rx_vfo->dtmf_decoding_enable)
+					if (g_rx_vfo->channel.dtmf_decoding_enable)
 				#endif
 				{
 					if (g_dtmf_rx_index >= (sizeof(g_dtmf_rx) - 1))
@@ -1539,7 +1542,7 @@ void APP_process_flash_light_10ms(void)
 						GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
 						#ifdef ENABLE_FLASH_LIGHT_SOS_TONE
 							if (!g_squelch_open && !g_monitor_enabled && !GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER))
-								BK4819_StartTone1(880, 50, true);
+								BK4819_StartTone1(880, 50);
 						#endif
 					}
 				}
@@ -2321,7 +2324,7 @@ void APP_time_slice_10ms(void)
 	#endif
 
 	#ifdef ENABLE_AM_FIX
-		if (g_rx_vfo->am_mode > 0 && g_eeprom.config.setting.am_fix)
+		if (g_rx_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix)
 			AM_fix_10ms(g_rx_vfo_num);
 	#endif
 
@@ -2686,10 +2689,10 @@ static void APP_process_key(const key_code_t Key, const bool key_pressed, const 
 
 						BK4819_ExitDTMF_TX(false);
 
-						if (g_current_vfo->scrambling_type == 0 || !g_eeprom.config.setting.enable_scrambler)
+						if (g_current_vfo->channel.scrambler == 0 || !g_eeprom.config.setting.enable_scrambler)
 							BK4819_DisableScramble();
 						else
-							BK4819_EnableScramble(g_current_vfo->scrambling_type - 1);
+							BK4819_EnableScramble(g_current_vfo->channel.scrambler - 1);
 					}
 				}
 				else
