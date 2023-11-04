@@ -55,7 +55,7 @@ ENABLE_TX_WHEN_AM                := 1
 ENABLE_F_CAL_MENU                := 1
 ENABLE_TX_UNLOCK                 := 1
 ENABLE_CTCSS_TAIL_PHASE_SHIFT    := 1
-ENABLE_CONTRAST                  := 0
+ENABLE_CONTRAST                  := 1
 ENABLE_BOOT_BEEPS                := 0
 ENABLE_DTMF_CALL_FLASH_LIGHT     := 1
 ENABLE_FLASH_LIGHT_SOS_TONE      := 1
@@ -79,7 +79,7 @@ ENABLE_RX_SIGNAL_BAR             := 0
 # Tx Audio Bar 300 B
 ENABLE_TX_AUDIO_BAR              := 0
 # Side Button Menu 300 B
-ENABLE_SIDE_BUTT_MENU            := 1
+ENABLE_SIDE_BUTT_MENU            := 0
 # Key Lock 400 B
 ENABLE_KEYLOCK                   := 0
 #ENABLE_PANADAPTER               := 0

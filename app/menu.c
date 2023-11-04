@@ -498,7 +498,8 @@ void MENU_AcceptSetting(void)
 			g_tx_vfo->channel.scrambler = g_sub_menu_selection;
 			#if 0
 				if (g_sub_menu_selection > 0 && g_eeprom.config.setting.enable_scrambler)
-					BK4819_EnableScramble(g_sub_menu_selection - 1);
+//					BK4819_EnableScramble(g_sub_menu_selection - 1);
+					BK4819_EnableScramble(2600 + ((g_sub_menu_selection - 1) * 100));
 				else
 					BK4819_DisableScramble();
 			#endif
@@ -564,8 +565,8 @@ void MENU_AcceptSetting(void)
 
 		#ifdef ENABLE_CONTRAST
 			case MENU_CONTRAST:
-				g_setting_contrast = g_sub_menu_selection;
-				ST7565_SetContrast(g_setting_contrast);
+				g_eeprom.config.setting.lcd_contrast = g_sub_menu_selection;
+				ST7565_SetContrast(g_eeprom.config.setting.lcd_contrast);
 				break;
 		#endif
 		
@@ -856,7 +857,7 @@ void MENU_AcceptSetting(void)
 
 		case MENU_SCRAMBLER_EN:
 			g_eeprom.config.setting.enable_scrambler = g_sub_menu_selection;
-			g_flag_reconfigure_vfos    = true;
+			g_flag_reconfigure_vfos = true;
 			break;
 
 		case MENU_TX_EN:
@@ -1060,11 +1061,11 @@ void MENU_ShowCurrentSetting(void)
 			g_sub_menu_selection = g_eeprom.config.setting.backlight_on_tx_rx;
 			break;
 
-#ifdef ENABLE_CONTRAST
+		#ifdef ENABLE_CONTRAST
 			case MENU_CONTRAST:
-				g_sub_menu_selection = g_setting_contrast;
+				g_sub_menu_selection = g_eeprom.config.setting.lcd_contrast;
 				break;
-#endif
+		#endif
 		
 		case MENU_DUAL_WATCH:
 //			g_sub_menu_selection = g_eeprom.config.setting.dual_watch;
