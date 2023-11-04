@@ -577,8 +577,10 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 				RADIO_configure_channel(vfo, VFO_CONFIGURE_RELOAD);
 			}
 
-			Frequency += g_tx_vfo->step_freq / 2; // for rounding to nearest step size
-			Frequency = FREQUENCY_floor_to_step(Frequency, g_tx_vfo->step_freq, FREQ_BAND_TABLE[g_tx_vfo->channel_attributes.band].lower, FREQ_BAND_TABLE[g_tx_vfo->channel_attributes.band].upper);
+			#if 0
+				Frequency += g_tx_vfo->step_freq / 2; // for rounding to nearest step size
+				Frequency = FREQUENCY_floor_to_step(Frequency, g_tx_vfo->step_freq, FREQ_BAND_TABLE[g_tx_vfo->channel_attributes.band].lower, FREQ_BAND_TABLE[g_tx_vfo->channel_attributes.band].upper);
+			#endif
 
 			if (Frequency >= BX4819_BAND1.upper && Frequency < BX4819_BAND2.lower)
 			{	// clamp the frequency to the limit
@@ -751,8 +753,24 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 				g_fkey_pressed  = false;
 				g_update_status = true;
 
-				#ifdef ENABLE_COPY_CHAN_TO_VFO_TO_CHAN
+				#ifdef ENABLE_SCAN_IGNORE_LIST
+
+					if (g_scan_state_dir == SCAN_STATE_DIR_OFF &&
+					    g_css_scan_mode == CSS_SCAN_MODE_OFF &&
+					    FI_freq_ignored(g_rx_vfo->p_rx->frequency) >= 0)
+					{	// remove the frequency from the ignore list
+						FI_sub_freq_ignored(g_rx_vfo->p_rx->frequency);
+						g_update_display = true;
+					}
+					#ifdef ENABLE_COPY_CHAN_TO_VFO_TO_CHAN
+						else
+							MAIN_copy_mem_vfo_mem();
+					#endif
+
+				#elif defined(ENABLE_COPY_CHAN_TO_VFO_TO_CHAN)
+
 					MAIN_copy_mem_vfo_mem();
+
 				#endif
 			}
 		}
@@ -875,7 +893,7 @@ void MAIN_Key_STAR(bool key_pressed, bool key_held)
 	g_update_status = true;
 }
 
-void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Direction)
+void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t direction)
 {
 	#ifdef ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS
 		static bool monitor_was_enabled = false;
@@ -914,7 +932,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 			RADIO_ApplyOffset(g_tx_vfo, true);
 
 			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-//				UART_printf("save chan %u\r\n", g_tx_vfo->channel_save);
+//				UART_printf("save chan %u\r\n", g_rx_vfo->channel_save);
 			#endif
 		}
 
@@ -964,43 +982,46 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 			if (IS_FREQ_CHANNEL(Channel))
 			{	// frequency mode
 
-				frequency_band_t       new_band;
-				const frequency_band_t old_band  = FREQUENCY_GetBand(g_tx_vfo->freq_config_rx.frequency);
-				const uint32_t         frequency = APP_set_frequency_by_step(g_tx_vfo, Direction);
+				uint32_t               freq  = g_tx_vfo->freq_config_rx.frequency;
+				const uint32_t         step  = g_tx_vfo->step_freq;
+				const frequency_band_t band  = FREQUENCY_GetBand(freq);
+				const uint32_t         upper = FREQ_BAND_TABLE[band].upper;
+				const uint32_t         lower = FREQ_BAND_TABLE[band].lower;
+			
+				freq += step * direction;
 
-				if (FREQUENCY_rx_freq_check(frequency) < 0)
+				// wrap-a-round
+				while (freq >= upper)
+					freq -= upper - lower;
+				while (freq < lower)
+					freq += upper - lower;
+
+				if (band == BAND2_108MHz)  // air band uses set channels. so round to those channels
+					freq = lower + ((((freq - lower) + (step / 2)) / step) * step);
+
+				if (FREQUENCY_rx_freq_check(freq) < 0)
 				{	// frequency not allowed
 					g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
 					return;
 				}
 
-				// compute the frequency band for the frequency
-				new_band = FREQUENCY_GetBand(frequency);
+				g_tx_vfo->freq_config_rx.frequency = freq;
 
-				// save the new frequency into the VFO
-				g_tx_vfo->freq_config_rx.frequency = frequency;
-				g_tx_vfo->freq_config_tx.frequency = frequency;
+				RADIO_ApplyOffset(g_tx_vfo, false);
 
-				// find the first channel that contains this frequency
-				//
-				// this currently takes to long to look through all the channels (200)
-				// with every frequency step, because we have to read each channel from eeprom
-				// before checking the channels frequency
-				//
-				// TODO: include this once we have the entire eeprom loaded
+				// find the first channel that contains this frequency .. currently takes too long
 				//
 				//if (!key_held && key_pressed)
-				//	g_tx_vfo->freq_in_channel = SETTINGS_find_channel(frequency);
+				//	g_tx_vfo->freq_in_channel = SETTINGS_find_channel(freq);
 				//else
 				//if (key_held && key_pressed)
 					g_tx_vfo->freq_in_channel = 0xff;
 
-				if (new_band != old_band)
-				{	// original slow method
+				#if 0
+					// original slow method
 					g_request_save_channel = 1;
-				}
-				else
-				{	// don't need to go through all the other stuff
+				#else
+					// don't need to go through all the other stuff
 					// lets speed things up by simply setting the VCO/PLL frequency
 					// and the RF filter path (LNA and PA)
 
@@ -1017,9 +1038,9 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 						}
 					#endif
 
-					BK4819_set_rf_frequency(frequency, true);  // set the VCO/PLL
-					BK4819_set_rf_filter_path(frequency);      // set the proper LNA/PA filter path
-				}
+					BK4819_set_rf_frequency(freq, true);  // set the VCO/PLL
+					BK4819_set_rf_filter_path(freq);      // set the proper LNA/PA filter path
+				#endif
 
 				return;
 			}
@@ -1028,7 +1049,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 
 			g_tx_vfo->freq_in_channel = 0xff;
 
-			Next = RADIO_FindNextChannel(Channel + Direction, Direction, false, 0);
+			Next = RADIO_FindNextChannel(Channel + direction, direction, false, 0);
 			if (Next == 0xFF)
 				return;
 
@@ -1048,7 +1069,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 				}
 			#endif
 
-			g_eeprom.config.setting.indices.vfo[g_eeprom.config.setting.tx_vfo_num].user = Next;
+			g_eeprom.config.setting.indices.vfo[g_eeprom.config.setting.tx_vfo_num].user   = Next;
 			g_eeprom.config.setting.indices.vfo[g_eeprom.config.setting.tx_vfo_num].screen = Next;
 
 			if (!key_held)
@@ -1079,7 +1100,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t Directio
 	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 
 	// jump to the next channel
-	APP_channel_next(false, Direction);
+	APP_channel_next(false, direction);
 
 	// go NOW
 	g_scan_pause_tick_10ms = 0;

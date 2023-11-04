@@ -294,9 +294,9 @@ void RADIO_configure_channel(const unsigned int VFO, const unsigned int configur
 	else
 	if (frequency >= FREQ_BAND_TABLE[attributes.band].upper)
 		frequency = FREQUENCY_floor_to_step(frequency, p_vfo->step_freq, FREQ_BAND_TABLE[attributes.band].lower, FREQ_BAND_TABLE[attributes.band].upper);
-	else
-	if (channel >= FREQ_CHANNEL_FIRST)
-		frequency = FREQUENCY_floor_to_step(frequency, p_vfo->step_freq, FREQ_BAND_TABLE[attributes.band].lower, FREQ_BAND_TABLE[attributes.band].upper);
+//	else
+//	if (channel >= FREQ_CHANNEL_FIRST)
+//		frequency = FREQUENCY_floor_to_step(frequency, p_vfo->step_freq, FREQ_BAND_TABLE[attributes.band].lower, FREQ_BAND_TABLE[attributes.band].upper);
 
 	if (!g_eeprom.config.setting.enable_350 && frequency >= 35000000 && frequency < 40000000)
 	{	// 350~400Mhz not allowed
@@ -790,11 +790,10 @@ void RADIO_setup_registers(bool switch_to_function_foreground)
 					break;
 			}
 
-			if (g_rx_vfo->channel.scrambler > 0 && g_eeprom.config.setting.enable_scrambler)
-//				BK4819_EnableScramble(g_rx_vfo->channel.scrambler - 1);
-				BK4819_EnableScramble(2600 + ((g_rx_vfo->channel.scrambler - 1) * 100));
+			if (g_eeprom.config.setting.enable_scrambler)
+				BK4819_set_scrambler(g_rx_vfo->channel.scrambler);
 			else
-				BK4819_DisableScramble();
+				BK4819_set_scrambler(0);
 		}
 	}
 	#ifdef ENABLE_NOAA

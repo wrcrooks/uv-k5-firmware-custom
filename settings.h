@@ -213,17 +213,24 @@ typedef struct {
 	// [13]
 	uint8_t  dtmf_decoding_enable:1;         //
 	uint8_t  dtmf_ptt_id_tx_mode:3;          //
-	uint8_t  unused6:4;                      //
-	// [14]
-	uint8_t  step_setting;                   //
-	// [15]
-	uint8_t  scrambler:4;                    //
 	#if 0
 		// QS
-		uint8_t unused7:4;                   //
+		uint8_t unused6:4;                   //
 	#else
 		// 1of11
 		uint8_t squelch_level:4;             // 0 ~ 9 per channel squelch, 0 = use main squelch level
+	#endif
+	// [14]
+	uint8_t  step_setting;                   //
+	// [15]
+	#if 0
+		// QS
+		uint8_t scrambler:4;                 //
+		uint8_t unused7:4;                   //
+	#else
+		// 1of11
+		uint8_t scrambler:5;                 // more scrambler frequencies
+		uint8_t unused7:3;                   //
 	#endif
 } __attribute__((packed)) t_channel;         //
 
@@ -279,6 +286,8 @@ typedef struct {
 		uint8_t        vox_enabled;                     //
 		uint8_t        vox_level;                       //
 		uint8_t        mic_sensitivity;                 //
+
+		// 0x0E78
 		#ifdef ENABLE_CONTRAST
 			uint8_t    lcd_contrast;                    // 1of11
 		#else
