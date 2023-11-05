@@ -44,6 +44,12 @@
 
 //#define SHOW_RX_TEST_VALUES
 
+//const int     rssi_offset_band_123  = 0;
+//const int     rssi_offset_band_4567 = 0;
+
+const int     rssi_offset_band_123  = -16;
+const int     rssi_offset_band_4567 = 24;
+
 center_line_t g_center_line = CENTER_LINE_NONE;
 
 // ***************************************************************************
@@ -170,14 +176,13 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 #endif
 
 #ifdef ENABLE_RX_SIGNAL_BAR
-	bool UI_DisplayRSSIBar(const int16_t rssi, const uint16_t glitch, const uint16_t noise, const bool now)
+	bool UI_DisplayRSSIBar(const int rssi, const unsigned int glitch, const unsigned int noise, const bool now)
 	{
 		if (g_eeprom.config.setting.enable_rssi_bar)
 		{
 			#ifdef SHOW_RX_TEST_VALUES
 
-				const unsigned int line   = 3;
-				uint8_t           *p_line = g_frame_buffer[line];
+				const unsigned int line  = 3;
 				char               str[22];
 
 				#ifdef ENABLE_KEYLOCK
@@ -189,9 +194,9 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 					return false;     // display is in use
 
 				if (now)
-					memset(p_line, 0, LCD_WIDTH);
+					memset(g_frame_buffer[line], 0, LCD_WIDTH);
 
-				sprintf(str, "r %3u g %3u n %3u", (uint16_t )rssi, glitch, noise);
+				sprintf(str, "r %3d g %3u n %3u", rssi, glitch, noise);
 				UI_PrintStringSmall(str, 2, 0, line);
 
 				if (now)
@@ -204,13 +209,13 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 				(void)glitch;  // TODO:
 				(void)noise;
 
-//				const int16_t      s0_dBm       = -127;                  // S0 .. base level
-				const int16_t      s0_dBm       = -147;                  // S0 .. base level
+//				const int          s0_dBm       = -127;                  // S0 .. base level
+				const int          s0_dBm       = -147;                  // S0 .. base level
 
-				const int16_t      s9_dBm       = s0_dBm + (6 * 9);      // S9 .. 6dB/S-Point
-				const int16_t      bar_max_dBm  = s9_dBm + 60;           // S9+60dB
-//				const int16_t      bar_min_dBm  = s0_dBm + (6 * 0);      // S0
-				const int16_t      bar_min_dBm  = s0_dBm + (6 * 4);      // S4
+				const int          s9_dBm       = s0_dBm + (6 * 9);      // S9 .. 6dB/S-Point
+				const int          bar_max_dBm  = s9_dBm + 60;           // S9+60dB
+//				const int          bar_min_dBm  = s0_dBm + (6 * 0);      // S0
+				const int          bar_min_dBm  = s0_dBm + (6 * 4);      // S4
 
 				// ************
 
@@ -218,13 +223,12 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 				const unsigned int bar_x        = 2 + txt_width + 4;     // X coord of bar graph
 				const unsigned int bar_width    = LCD_WIDTH - 1 - bar_x;
 
-				const int16_t      rssi_dBm     = (rssi / 2) - 160;
-				const int16_t      clamped_dBm  = (rssi_dBm <= bar_min_dBm) ? bar_min_dBm : (rssi_dBm >= bar_max_dBm) ? bar_max_dBm : rssi_dBm;
+				const int          rssi_dBm     = (rssi / 2) - 160;
+				const int          clamped_dBm  = (rssi_dBm <= bar_min_dBm) ? bar_min_dBm : (rssi_dBm >= bar_max_dBm) ? bar_max_dBm : rssi_dBm;
 				const unsigned int bar_range_dB = bar_max_dBm - bar_min_dBm;
 				const unsigned int len          = ((clamped_dBm - bar_min_dBm) * bar_width) / bar_range_dB;
 
 				const unsigned int line         = 3;
-				uint8_t           *p_line        = g_frame_buffer[line];
 
 				char               s[16];
 
@@ -239,7 +243,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 					return false;     // display is in use
 
 				if (now)
-					memset(p_line, 0, LCD_WIDTH);
+					memset(g_frame_buffer[line], 0, LCD_WIDTH);
 
 				if (rssi_dBm >= (s9_dBm + 6))
 				{	// S9+XXdB, 1dB increment
@@ -254,7 +258,7 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 				}
 				UI_PrintStringSmall(s, 2, 0, line);
 
-				draw_bar(p_line + bar_x, len, bar_width);
+				draw_bar(g_frame_buffer[line] + bar_x, len, bar_width);
 
 				if (now)
 					ST7565_BlitFullScreen();
@@ -268,73 +272,80 @@ void UI_drawBars(uint8_t *p, const unsigned int level)
 	}
 #endif
 
-void UI_update_rssi(const int16_t rssi, const uint16_t glitch, const uint16_t noise, const int vfo)
+void UI_update_rssi(const int rssi, const unsigned int glitch, const unsigned int noise, const unsigned int vfo)
 {
 	#ifdef ENABLE_RX_SIGNAL_BAR
+
 		if (g_center_line == CENTER_LINE_RSSI)
-		{	// optional larger RSSI dBm, S-point and bar level
+		{	// large RSSI dBm, S-point, bar level
+
+			const int rssi_level = (g_tx_vfo->channel_attributes.band < 3) ? rssi + rssi_offset_band_123 : rssi + rssi_offset_band_4567;
+
 			//if (g_current_function == FUNCTION_RECEIVE && g_squelch_open)
 			if (g_current_function == FUNCTION_RECEIVE)
-				UI_DisplayRSSIBar(rssi, glitch, noise, true);
+				UI_DisplayRSSIBar(rssi_level, glitch, noise, true);
 		}
+
 	#else
 		(void)glitch;
 		(void)noise;
 	#endif
 
-	{	// original little RS bars
+	{	// original little RSSI bars
 
-//		const int16_t dBm        = (rssi / 2) - 160;
-		const uint8_t Line       = (vfo == 0) ? 3 : 7;
-		uint8_t      *p_line     = g_frame_buffer[Line - 1];
-		uint8_t       rssi_level = 0;
-
-		// TODO: sort out all 8 values from the eeprom
+		const unsigned int line       = (vfo == 0) ? 3 : 7;
+		uint8_t           *pline      = g_frame_buffer[line - 1];
+		unsigned int       rssi_level = 0;
+		int                rssi_cal[7];
 
 		#if 1
-			const unsigned int band = g_rx_vfo->channel_attributes.band;
-			const int16_t level0  = g_eeprom_rssi_calib[band][0];
-			const int16_t level1  = g_eeprom_rssi_calib[band][1];
-			const int16_t level2  = g_eeprom_rssi_calib[band][2];
-			const int16_t level3  = g_eeprom_rssi_calib[band][3];
+			if (g_tx_vfo->channel_attributes.band < 3)
+			{
+				rssi_cal[0] = g_eeprom.calib.rssi_cal.band_123[0];
+				rssi_cal[2] = g_eeprom.calib.rssi_cal.band_123[1];
+				rssi_cal[4] = g_eeprom.calib.rssi_cal.band_123[2];
+				rssi_cal[6] = g_eeprom.calib.rssi_cal.band_123[3];
+			}
+			else
+			{
+				rssi_cal[0] = g_eeprom.calib.rssi_cal.band_4567[0];
+				rssi_cal[2] = g_eeprom.calib.rssi_cal.band_4567[1];
+				rssi_cal[4] = g_eeprom.calib.rssi_cal.band_4567[2];
+				rssi_cal[6] = g_eeprom.calib.rssi_cal.band_4567[3];
+			}
 		#else
-			const int16_t level0  = (-115 + 160) * 2;   // -115dBm
-			const int16_t level1  = ( -89 + 160) * 2;   //  -89dBm
-			const int16_t level2  = ( -64 + 160) * 2;   //  -64dBm
-			const int16_t level3  = ( -39 + 160) * 2;   //  -39dBm
+			rssi_cal[0] = (-110 + rssi_dBm_offset) * 2;   // -110 dBm
+			rssi_cal[2] = ( -90 + rssi_dBm_offset) * 2;   //  -90 dBm
+			rssi_cal[4] = ( -70 + rssi_dBm_offset) * 2;   //  -70 dBm
+			rssi_cal[6] = ( -50 + rssi_dBm_offset) * 2;   //  -50 dBm
 		#endif
-		// create intermediate threshold values (linear interpolation) to make full use of the available RSSI bars/graphics
-		const int16_t level01 = (level0 + level1) / 2;
-		const int16_t level12 = (level1 + level2) / 2;
-		const int16_t level23 = (level2 + level3) / 2;
+		// linear interpolate the 4 values into 7
+		rssi_cal[1] = (rssi_cal[0] + rssi_cal[2]) / 2;
+		rssi_cal[3] = (rssi_cal[2] + rssi_cal[4]) / 2;
+		rssi_cal[5] = (rssi_cal[4] + rssi_cal[6]) / 2;
 
 		g_vfo_rssi[vfo] = rssi;
 
-		if (rssi >= level3)
+		if (rssi >= rssi_cal[6])
 			rssi_level = 7;
 		else
-		if (rssi >= level23)
+		if (rssi >= rssi_cal[5])
 			rssi_level = 6;
 		else
-		if (rssi >= level2)
+		if (rssi >= rssi_cal[4])
 			rssi_level = 5;
 		else
-		if (rssi >= level12)
+		if (rssi >= rssi_cal[3])
 			rssi_level = 4;
 		else
-		if (rssi >= level1)
+		if (rssi >= rssi_cal[2])
 			rssi_level = 3;
 		else
-		if (rssi >= level01)
+		if (rssi >= rssi_cal[1])
 			rssi_level = 2;
 		else
-		if (rssi >= level0 || g_current_function == FUNCTION_NEW_RECEIVE)
-		{
+		if (rssi >= rssi_cal[0] || g_current_function == FUNCTION_NEW_RECEIVE)
 			rssi_level = 1;
-		}
-
-		if (g_vfo_rssi_bar_level[vfo] == rssi_level)
-			return;
 
 		g_vfo_rssi_bar_level[vfo] = rssi_level;
 
@@ -348,18 +359,14 @@ void UI_update_rssi(const int16_t rssi, const uint16_t glitch, const uint16_t no
 		if (g_current_function == FUNCTION_TRANSMIT || g_current_display_screen != DISPLAY_MAIN)
 			return;    // display is in use
 
-		p_line = g_frame_buffer[Line - 1];
-
-		memset(p_line, 0, 23);
-
-		// untested !!!
+		memset(pline, 0, 23);
 
 		if (rssi_level == 0)
-			p_line = NULL;
+			pline = NULL;
 		else
-			UI_drawBars(p_line, rssi_level);
+			UI_drawBars(pline, rssi_level);
 
-		ST7565_DrawLine(0, Line, 23, p_line);
+		ST7565_DrawLine(0, line, 23, pline);
 	}
 }
 
@@ -768,31 +775,20 @@ void UI_DisplayMain(void)
 				const uint8_t freq_in_channel = g_vfo_info[vfo_num].freq_in_channel;
 //				const uint8_t freq_in_channel = SETTINGS_find_channel(frequency);  // currently way to slow
 
-//				if (g_vfo_info[vfo_num].channel.compand)
-				{
-					strcpy(str, "   ");
+				strcpy(str, "   ");
 
-					#ifdef ENABLE_SCAN_IGNORE_LIST
-						if (FI_freq_ignored(frequency) >= 0)
-							str[0] = 'I';  // frequency is in the ignore list
-					#endif
+				#ifdef ENABLE_SCAN_IGNORE_LIST
+					if (FI_freq_ignored(frequency) >= 0)
+						str[0] = 'I';  // frequency is in the ignore list
+				#endif
 
-					if (is_freq_chan && freq_in_channel <= USER_CHANNEL_LAST)
-						str[1] = 'F';  // channel number that contains this VFO frequency
+				if (is_freq_chan && freq_in_channel <= USER_CHANNEL_LAST)
+					str[1] = 'F';  // this VFO frequency is also found in a channel
 
-					if (g_vfo_info[vfo_num].channel.compand)
-						str[2] = 'C';  // compander is enabled
+				if (g_vfo_info[vfo_num].channel.compand)
+					str[2] = 'C';  // compander is enabled
 
-					UI_PrintStringSmall(str, LCD_WIDTH - (7 * 3), 0, line + 1);
-				}
-//				else
-//				{
-//					if (is_freq_chan && freq_in_channel <= USER_CHANNEL_LAST)
-//					{	// channel number that contains this VFO frequency
-//						sprintf(str, "%03u", freq_in_channel);
-//						UI_PrintStringSmall(str, LCD_WIDTH - (7 * 3), 0, line + 1);
-//					}
-//				}
+				UI_PrintStringSmall(str, LCD_WIDTH - (7 * 3), 0, line + 1);
 			}
 			#endif
 		}
@@ -951,8 +947,9 @@ void UI_DisplayMain(void)
 			// show the RX RSSI dBm, S-point and signal strength bar graph
 			if (rx && g_eeprom.config.setting.enable_rssi_bar)
 			{
+				const int rssi_level = (g_tx_vfo->channel_attributes.band < 3) ? g_current_rssi[g_rx_vfo_num] + rssi_offset_band_123 : g_current_rssi[g_rx_vfo_num] + rssi_offset_band_4567;
 				g_center_line = CENTER_LINE_RSSI;
-				UI_DisplayRSSIBar(g_current_rssi[g_rx_vfo_num], g_current_glitch[g_rx_vfo_num], g_current_noise[g_rx_vfo_num], false);
+				UI_DisplayRSSIBar(rssi_level, g_current_glitch[g_rx_vfo_num], g_current_noise[g_rx_vfo_num], false);
 			}
 			else
 		#endif

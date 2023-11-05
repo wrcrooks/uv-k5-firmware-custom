@@ -350,9 +350,9 @@ void RADIO_configure_channel(const unsigned int VFO, const unsigned int configur
 	RADIO_ConfigureSquelchAndOutputPower(p_vfo);
 
 	#ifdef ENABLE_AM_FIX
+		AM_fix_reset(VFO);
 		if (p_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix)
 		{
-			AM_fix_reset(VFO);
 			AM_fix_10ms(VFO);
 		}
 		else
@@ -644,16 +644,23 @@ void RADIO_setup_registers(bool switch_to_function_foreground)
 		case BK4819_FILTER_BW_NARROW:
 			#ifdef ENABLE_AM_FIX
 				#if 0
-//					BK4819_SetFilterBandwidth(Bandwidth, g_rx_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix);
-					BK4819_SetFilterBandwidth(Bandwidth, true);
+					BK4819_SetFilterBandwidth(Bandwidth);
+					BK4819_EnableAFC();
 				#else
 					if (g_rx_vfo->channel.am_mode > 1)
-						BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROWER, false);
+					{
+						BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROWER); // sideband
+						BK4819_DisableAFC();
+					}
 					else
-						BK4819_SetFilterBandwidth(Bandwidth, true);
+					{
+						BK4819_SetFilterBandwidth(Bandwidth);
+						BK4819_EnableAFC();
+					}
 				#endif
 			#else
 				BK4819_SetFilterBandwidth(Bandwidth, false);
+				BK4819_EnableAFC();
 			#endif
 			break;
 	}
@@ -908,16 +915,23 @@ void RADIO_enableTX(const bool fsk_tx)
 		case BK4819_FILTER_BW_NARROW:
 			#ifdef ENABLE_AM_FIX
 				#if 0
-//					BK4819_SetFilterBandwidth(Bandwidth, g_current_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix);
-					BK4819_SetFilterBandwidth(Bandwidth, true);
+					BK4819_SetFilterBandwidth(Bandwidth);
+					BK4819_EnableAFC();
 				#else
 					if (g_current_vfo->channel.am_mode > 1)
-						BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROWER, false);
+					{
+						BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROWER); // sideband
+						BK4819_DisableAFC();
+					}
 					else
-						BK4819_SetFilterBandwidth(Bandwidth, true);
+					{
+						BK4819_SetFilterBandwidth(Bandwidth);
+						BK4819_EnableAFC();
+					}
 				#endif
 			#else
-				BK4819_SetFilterBandwidth(Bandwidth, false);
+				BK4819_SetFilterBandwidth(Bandwidth);
+				BK4819_EnableAFC();
 			#endif
 			break;
 	}
