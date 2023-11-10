@@ -1,10 +1,8 @@
 
 # compile options (see README.md for descriptions)
+#
 # 0 = remove code
 # 1 = include code
-
-# When testing the extra options, be careful not to exceed the
-# 64 kB flash memory limit.
 
 ENABLE_CLANG                     := 0
 ENABLE_SWD                       := 1
@@ -12,7 +10,7 @@ ENABLE_OVERLAY                   := 0
 ENABLE_LTO                       := 1
 # UART Programming 2.9 kB
 ENABLE_UART                      := 1
-ENABLE_UART_DEBUG                := 0
+ENABLE_UART_DEBUG                := 1
 # AirCopy 2.5 kB
 ENABLE_AIRCOPY                   := 0
 ENABLE_AIRCOPY_REMEMBER_FREQ     := 0
@@ -30,7 +28,7 @@ ENABLE_NOAA                      := 0
 ENABLE_VOICE                     := 0
 ENABLE_MUTE_RADIO_FOR_VOICE      := 0
 # Tx on Voice 1.0 kB
-ENABLE_VOX                       := 1
+ENABLE_VOX                       := 0
 ENABLE_VOX_MORE_SENSITIVE        := 1
 ENABLE_REDUCE_LOW_MID_TX_POWER   := 1
 # Tx Alarm 600 B
@@ -39,16 +37,17 @@ ENABLE_TX1750                    := 0
 # MDC1200 2.8 kB
 ENABLE_MDC1200                   := 0
 ENABLE_MDC1200_SHOW_OP_ARG       := 1
+ENABLE_MDC1200_SIDE_BEEP         := 1
 ENABLE_PWRON_PASSWORD            := 0
 ENABLE_RESET_AES_KEY             := 0
 ENABLE_BIG_FREQ                  := 1
+ENABLE_SHOW_FREQS_CHAN           := 0
 # smaa bolf 580 B
 ENABLE_SMALL_BOLD                := 1
 # smallest font 2 kB
 ENABLE_SMALLEST_FONT             := 0
 # trim trailing 44 B
 ENABLE_TRIM_TRAILING_ZEROS       := 0
-ENABLE_KEEP_MEM_NAME             := 1
 ENABLE_WIDE_RX                   := 1
 ENABLE_TX_WHEN_AM                := 1
 # Freq calibration 188 B
@@ -61,9 +60,11 @@ ENABLE_DTMF_CALL_FLASH_LIGHT     := 1
 ENABLE_FLASH_LIGHT_SOS_TONE      := 1
 ENABLE_SHOW_CHARGE_LEVEL         := 1
 ENABLE_REVERSE_BAT_SYMBOL        := 1
+ENABLE_FREQ_SEARCH_LNA           := 1
 ENABLE_FREQ_SEARCH_TIMEOUT       := 0
 ENABLE_CODE_SEARCH_TIMEOUT       := 0
 ENABLE_SCAN_IGNORE_LIST          := 1
+ENABLE_SCAN_RANGES               := 1
 # Kill and Revive 400 B
 ENABLE_KILL_REVIVE               := 0
 # AM Fix 800 B
@@ -81,7 +82,7 @@ ENABLE_TX_AUDIO_BAR              := 0
 # Side Button Menu 300 B
 ENABLE_SIDE_BUTT_MENU            := 0
 # Key Lock 400 B
-ENABLE_KEYLOCK                   := 0
+ENABLE_KEYLOCK                   := 1
 ENABLE_PANADAPTER                := 0
 #ENABLE_SINGLE_VFO_CHAN          := 0
 
@@ -146,9 +147,7 @@ ifeq ($(ENABLE_FMRADIO), 1)
 	OBJS += driver/bk1080.o
 endif
 OBJS += driver/bk4819.o
-ifeq ($(filter $(ENABLE_AIRCOPY) $(ENABLE_UART) $(ENABLE_MDC1200), 1), 1)
-	OBJS += driver/crc.o
-endif
+OBJS += driver/crc.o
 OBJS += driver/eeprom.o
 ifeq ($(ENABLE_OVERLAY),1)
 	OBJS += driver/flash.o
@@ -326,6 +325,9 @@ endif
 ifeq ($(ENABLE_BIG_FREQ),1)
 	CFLAGS  += -DENABLE_BIG_FREQ
 endif
+ifeq ($(ENABLE_SHOW_FREQS_CHAN),1)
+	CFLAGS  += -DENABLE_SHOW_FREQS_CHAN
+endif
 ifeq ($(ENABLE_SMALL_BOLD),1)
 	CFLAGS  += -DENABLE_SMALL_BOLD
 endif
@@ -365,14 +367,14 @@ endif
 ifeq ($(ENABLE_MDC1200_SHOW_OP_ARG),1)
 	CFLAGS  += -DENABLE_MDC1200_SHOW_OP_ARG
 endif
+ifeq ($(ENABLE_MDC1200_SIDE_BEEP),1)
+	CFLAGS  += -DENABLE_MDC1200_SIDE_BEEP
+endif
 ifeq ($(ENABLE_PWRON_PASSWORD),1)
 	CFLAGS  += -DENABLE_PWRON_PASSWORD
 endif
 ifeq ($(ENABLE_RESET_AES_KEY),1)
 	CFLAGS  += -DENABLE_RESET_AES_KEY
-endif
-ifeq ($(ENABLE_KEEP_MEM_NAME),1)
-	CFLAGS  += -DENABLE_KEEP_MEM_NAME
 endif
 ifeq ($(ENABLE_WIDE_RX),1)
 	CFLAGS  += -DENABLE_WIDE_RX
@@ -413,8 +415,14 @@ endif
 ifeq ($(ENABLE_SCAN_IGNORE_LIST),1)
 	CFLAGS  += -DENABLE_SCAN_IGNORE_LIST
 endif
+ifeq ($(ENABLE_SCAN_RANGES),1)
+	CFLAGS  += -DENABLE_SCAN_RANGES
+endif
 ifeq ($(ENABLE_KILL_REVIVE),1)
 	CFLAGS  += -DENABLE_KILL_REVIVE
+endif
+ifeq ($(ENABLE_FREQ_SEARCH_LNA),1)
+	CFLAGS  += -DENABLE_FREQ_SEARCH_LNA
 endif
 ifeq ($(ENABLE_FREQ_SEARCH_TIMEOUT),1)
 	CFLAGS  += -DENABLE_FREQ_SEARCH_TIMEOUT

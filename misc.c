@@ -180,12 +180,15 @@ uint16_t              g_low_battery_tick_10ms;
 
 reception_mode_t      g_rx_reception_mode;
 
+uint32_t              g_scan_initial_lower;
+uint32_t              g_scan_initial_upper;
+uint32_t              g_scan_initial_step_size;
 uint8_t               g_scan_next_channel;
 scan_next_chan_t      g_scan_current_scan_list;
 uint8_t               g_scan_restore_channel;
 uint32_t              g_scan_restore_frequency;
 bool                  g_scan_pause_time_mode;      // set if we stopped in SCAN_RESUME_TIME mode
-volatile uint16_t     g_scan_pause_tick_10ms;
+volatile uint16_t     g_scan_tick_10ms;
 scan_state_dir_t      g_scan_state_dir;
 
 uint8_t               g_rx_vfo_num;

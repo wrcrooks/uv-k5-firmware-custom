@@ -85,6 +85,9 @@ const t_menu_item g_menu_list[] =
 #ifdef ENABLE_KEYLOCK
 	{"KeyLOC", VOICE_ID_INVALID,                       MENU_AUTO_KEY_LOCK         }, // was "AUTOLk"
 #endif
+#ifdef ENABLE_SCAN_RANGES
+	{"SRANGE", VOICE_ID_INVALID,                       MENU_SCAN_RANGES           },
+#endif
 	{"S ADD1", VOICE_ID_INVALID,                       MENU_S_ADD1                },
 	{"S ADD2", VOICE_ID_INVALID,                       MENU_S_ADD2                },
 	{"STE",    VOICE_ID_INVALID,                       MENU_STE                   },
@@ -311,11 +314,11 @@ const char g_sub_menu_pwr_on_msg[4][14] =
 	"NONE"
 };
 
-const char g_sub_menu_roger_mode[2][16] =
+const char g_sub_menu_roger_mode[3][15] =
 {
 	"OFF",
-	"TX END\nROGER",
-//	"TX END\nMDC1200"
+	"TX END\nROGER 1",
+	"TX END\nROGER 2"
 };
 
 const char g_sub_menu_reset[2][4] =
@@ -558,8 +561,8 @@ void UI_DisplayMenu(void)
 				strcpy(str, "USE\nMAIN SQL");
 			else
 				sprintf(str, "%d", g_sub_menu_selection);
-//			g_tx_vfo->squelch_level = g_sub_menu_selection;
-//			RADIO_ConfigureSquelchAndOutputPower(g_tx_vfo);
+			//g_tx_vfo->squelch_level = g_sub_menu_selection;
+			//RADIO_ConfigureSquelch(g_tx_vfo);
 			channel_setting = true;
 			break;
 
@@ -765,6 +768,9 @@ void UI_DisplayMenu(void)
 		#ifdef ENABLE_AM_FIX
 //			case MENU_AM_FIX:
 		#endif
+		#ifdef ENABLE_SCAN_RANGES
+			case MENU_SCAN_RANGES:
+		#endif
 		case MENU_S_ADD1:
 		case MENU_S_ADD2:
 			strcpy(str, g_sub_menu_off_on[g_sub_menu_selection]);
@@ -844,7 +850,7 @@ void UI_DisplayMenu(void)
 		case MENU_MEM_DEL:
 		{
 			char s[11];
-			const bool valid = RADIO_CheckValidChannel(g_sub_menu_selection, false, 0);
+			const bool valid = RADIO_channel_valid(g_sub_menu_selection, false, 0);
 
 			UI_GenerateChannelStringEx(str, valid ? "CH-" : "", g_sub_menu_selection);
 
@@ -869,7 +875,7 @@ void UI_DisplayMenu(void)
 
 		case MENU_MEM_NAME:
 		{
-			const bool valid = RADIO_CheckValidChannel(g_sub_menu_selection, false, 0);
+			const bool valid = RADIO_channel_valid(g_sub_menu_selection, false, 0);
 			const unsigned int y = (!g_in_sub_menu || g_edit_index < 0) ? 1 : 0;
 
 			UI_GenerateChannelStringEx(str, valid ? "CH-" : "", g_sub_menu_selection);

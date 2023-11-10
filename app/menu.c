@@ -50,7 +50,7 @@
 #ifdef ENABLE_F_CAL_MENU
 	void writeXtalFreqCal(const int32_t value, const bool update_eeprom)
 	{
-		BK4819_WriteRegister(0x3B, 22656 + value);
+		BK4819_write_reg(0x3B, 22656 + value);
 
 		if (update_eeprom)
 		{
@@ -75,7 +75,7 @@ void MENU_start_css_scan(int8_t Direction)
 
 	MENU_SelectNextCode();
 
-	g_scan_pause_tick_10ms = scan_pause_css_10ms;
+	g_scan_tick_10ms = scan_pause_css_10ms;
 }
 
 void MENU_stop_css_scan(void)
@@ -238,7 +238,10 @@ int MENU_GetLimits(uint8_t Cursor, int32_t *pMin, int32_t *pMax)
 		case MENU_BUSY_CHAN_LOCK:
 		case MENU_BEEP:
 		#ifdef ENABLE_KEYLOCK
-		case MENU_AUTO_KEY_LOCK:
+			case MENU_AUTO_KEY_LOCK:
+		#endif
+		#ifdef ENABLE_SCAN_RANGES
+			case MENU_SCAN_RANGES:
 		#endif
 		case MENU_S_ADD1:
 		case MENU_S_ADD2:
@@ -398,11 +401,13 @@ void MENU_AcceptSetting(void)
 
 		case MENU_SQL:
 			g_eeprom.config.setting.squelch_level = g_sub_menu_selection;
+			RADIO_ConfigureSquelch(g_tx_vfo);
 			g_vfo_configure_mode   = VFO_CONFIGURE;
 			break;
 
 		case MENU_CHAN_SQL:
 			g_tx_vfo->channel.squelch_level = g_sub_menu_selection;
+			RADIO_ConfigureSquelch(g_tx_vfo);
 			g_request_save_channel = 1;
 			return;
 
@@ -523,20 +528,28 @@ void MENU_AcceptSetting(void)
 			return;
 
 		case MENU_MEM_NAME:
-			{	// trailing trim
-				int i;
+			{
+				const unsigned int chan      = g_sub_menu_selection;
+				t_channel_name    *chan_name = &g_eeprom.config.channel_name[chan];
+				int                i;
+
+				// trailing trim
 				for (i = 9; i >= 0; i--)
 				{
-					if (g_edit[i] != ' ' && g_edit[i] != '_' && g_edit[i] != 0x00 && g_edit[i] != 0xff)
+					if (g_edit[i] != ' ' && g_edit[i] != '_' && g_edit[i] != 0 && g_edit[i] != 0xff)
 						break;
 					g_edit[i] = ' ';
 				}
+
+				// save the channel name
+				if (g_eeprom.config.channel_attributes[chan].band <= BAND7_470MHz)
+				{
+					memset(chan_name,       0,      sizeof(t_channel_name));
+					memcpy(chan_name->name, g_edit, sizeof(chan_name->name));
+					SETTINGS_save_chan_name(chan);
+				}
 			}
 
-			// save the channel name
-			memset(&g_tx_vfo->channel_name, 0, sizeof(g_tx_vfo->channel_name));
-			memcpy(g_tx_vfo->channel_name.name, g_edit, sizeof(g_tx_vfo->channel_name.name));
-			SETTINGS_save_channel(g_sub_menu_selection, g_eeprom.config.setting.tx_vfo_num, g_tx_vfo, 3);
 			g_flag_reconfigure_vfos = true;
 			return;
 
@@ -620,6 +633,12 @@ void MENU_AcceptSetting(void)
 			g_eeprom.config.setting.auto_key_lock = g_sub_menu_selection;
 			g_key_lock_tick_500ms = key_lock_timeout_500ms;
 			break;
+		#endif
+
+		#ifdef ENABLE_SCAN_RANGES
+			case MENU_SCAN_RANGES:
+				g_eeprom.config.setting.scan_ranges_enable = g_sub_menu_selection;
+				break;
 		#endif
 
 		case MENU_S_ADD1:
@@ -764,20 +783,10 @@ void MENU_AcceptSetting(void)
 
 		case MENU_ROGER_MODE:
 			g_eeprom.config.setting.roger_mode = g_sub_menu_selection;
-			if (g_eeprom.config.setting.roger_mode != ROGER_MODE_OFF)
-			{
-				if (g_tx_vfo->channel.dtmf_ptt_id_tx_mode == PTT_ID_TX_DOWN ||
-				    g_tx_vfo->channel.dtmf_ptt_id_tx_mode == PTT_ID_BOTH    ||
-				    g_tx_vfo->channel.dtmf_ptt_id_tx_mode == PTT_ID_APOLLO)
-				{
-					g_tx_vfo->channel.dtmf_ptt_id_tx_mode = PTT_ID_OFF;  // // disable PTT ID tail
-					g_request_save_channel = 1;
-				}
-			}
 			break;
 
 		case MENU_MOD_MODE:
-			g_tx_vfo->channel.am_mode = g_sub_menu_selection;
+			g_tx_vfo->channel.mod_mode = g_sub_menu_selection;
 			g_request_save_channel = 1;
 		return;
 /*
@@ -925,7 +934,7 @@ void MENU_SelectNextCode(void)
 
 	RADIO_setup_registers(true);
 
-	g_scan_pause_tick_10ms = (g_selected_code_type == CODE_TYPE_CONTINUOUS_TONE) ? scan_pause_ctcss_10ms : scan_pause_cdcss_10ms;
+	g_scan_tick_10ms = (g_selected_code_type == CODE_TYPE_CONTINUOUS_TONE) ? scan_pause_ctcss_10ms : scan_pause_cdcss_10ms;
 
 	g_update_display = true;
 }
@@ -1107,6 +1116,12 @@ void MENU_ShowCurrentSetting(void)
 			break;
 		#endif
 
+		#ifdef ENABLE_SCAN_RANGES
+			case MENU_SCAN_RANGES:
+				g_sub_menu_selection = g_eeprom.config.setting.scan_ranges_enable;
+				break;
+		#endif
+
 		case MENU_S_ADD1:
 			g_sub_menu_selection = g_tx_vfo->channel_attributes.scanlist1;
 			break;
@@ -1244,7 +1259,7 @@ void MENU_ShowCurrentSetting(void)
 			break;
 
 		case MENU_MOD_MODE:
-			g_sub_menu_selection = g_tx_vfo->channel.am_mode;
+			g_sub_menu_selection = g_tx_vfo->channel.mod_mode;
 			break;
 /*
 #ifdef ENABLE_AM_FIX
@@ -1624,7 +1639,7 @@ static void MENU_Key_MENU(const bool key_pressed, const bool key_held)
 
 		#if 1
 			if (g_menu_cursor == MENU_MEM_DEL || g_menu_cursor == MENU_MEM_NAME)
-				if (!RADIO_CheckValidChannel(g_sub_menu_selection, false, 0))
+				if (!RADIO_channel_valid(g_sub_menu_selection, false, 0))
 					return;  // invalid channel
 		#endif
 
@@ -1634,7 +1649,7 @@ static void MENU_Key_MENU(const bool key_pressed, const bool key_held)
 //		if (g_menu_cursor != MENU_DTMF_LIST)
 		{
 			g_input_box_index = 0;
-			g_edit_index        = -1;
+			g_edit_index      = -1;
 		}
 
 		return;
@@ -1644,7 +1659,7 @@ static void MENU_Key_MENU(const bool key_pressed, const bool key_held)
 	{
 		if (g_edit_index < 0)
 		{	// enter channel name edit mode
-			if (!RADIO_CheckValidChannel(g_sub_menu_selection, false, 0))
+			if (!RADIO_channel_valid(g_sub_menu_selection, false, 0))
 				return;
 
 			SETTINGS_fetch_channel_name(g_edit, g_sub_menu_selection);
@@ -1775,7 +1790,7 @@ static void MENU_Key_STAR(const bool key_pressed, const bool key_held)
 
 	RADIO_select_vfos();
 
-	if (IS_NOT_NOAA_CHANNEL(g_rx_vfo->channel_save) && g_rx_vfo->channel.am_mode == 0)
+	if (IS_NOT_NOAA_CHANNEL(g_rx_vfo->channel_save) && g_rx_vfo->channel.mod_mode == MOD_MODE_FM)
 	{
 		if (g_menu_cursor == MENU_RX_CTCSS || g_menu_cursor == MENU_RX_CDCSS)
 		{	// scan CTCSS or DCS to find the tone/code of the incoming signal
@@ -1817,18 +1832,26 @@ static void MENU_Key_UP_DOWN(bool key_pressed, bool key_held, int8_t Direction)
 	{	// change the character
 		if (key_pressed && g_edit_index < 10 && Direction != 0)
 		{
-			const char   unwanted[] = "$%&!\"':;?^`|{}";
-			char         c          = g_edit[g_edit_index] + Direction;
-			unsigned int i          = 0;
-			while (i < sizeof(unwanted) && c >= 32 && c <= 126)
-			{
-				if (c == unwanted[i++])
-				{	// choose next character
-					c += Direction;
-					i = 0;
+			#if 0
+				const char   unwanted[] = "$%&!\"':;?^`|{}";
+				char         c          = g_edit[g_edit_index] + Direction;
+				unsigned int i          = 0;
+				while (i < sizeof(unwanted) && c >= 32 && c <= 126)
+				{
+					if (c == unwanted[i++])
+					{	// choose next character
+						c += Direction;
+						i = 0;
+					}
 				}
-			}
-			g_edit[g_edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
+				g_edit[g_edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
+			#else
+				// choose next character
+				char c = g_edit[g_edit_index] + Direction;
+				while (c < 32 || c > 126)
+					c += Direction;
+				g_edit[g_edit_index] = c;
+			#endif
 
 			g_request_display_screen = DISPLAY_MENU;
 		}

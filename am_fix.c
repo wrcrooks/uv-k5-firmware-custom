@@ -28,7 +28,7 @@
 #include "functions.h"
 #include "misc.h"
 
-//#define SET_RSSI_COMP
+#define SET_RSSI_COMP
 
 typedef struct
 {
@@ -104,10 +104,10 @@ static const t_gain_table gain_table[] =
 	{0x005E, -50},         //   1 .. 0 2 3 6 .. -33dB -14dB  0dB  -3dB .. -50dB
 	{0x015E, -47},         //   2 .. 1 2 3 6 .. -30dB -14dB  0dB  -3dB .. -47dB
 	{0x025E, -41},         //   3 .. 2 2 3 6 .. -24dB -14dB  0dB  -3dB .. -41dB
-	{0x035E, -17}          //   4 .. 3 2 3 6 ..   0dB -14dB  0dB  -3dB .. -17dB original
+	{0x035E, -17}          //   4 .. 3 2 3 6 ..   0dB -14dB  0dB  -3dB .. -17dB
 };
 
-static const unsigned int original_index = 1;
+static const unsigned int original_index = 0;
 
 #else
 	{0x0000, -98},         //   1 .. 0 0 0 0 .. -33dB -24dB -8dB -33dB .. -98dB
@@ -327,7 +327,7 @@ void AM_fix_10ms(const int vfo)
 	// save the corrected RSSI level
 	#ifdef ENABLE_AM_FIX_SHOW_DATA
 	{
-		const int16_t new_rssi    = rssi - rssi_gain_diff[vfo];
+		const int16_t  new_rssi   = rssi - rssi_gain_diff[vfo];
 		const uint16_t new_glitch = BK4819_GetGlitchIndicator();
 		const uint16_t new_noise  = BK4819_GetExNoiceIndicator();
 
@@ -427,7 +427,7 @@ void AM_fix_10ms(const int vfo)
 		gain_table_index_prev[vfo] = index;
 
 		// set the RF front end gains
-		BK4819_WriteRegister(0x13, gain_table[index].reg_val);
+		BK4819_write_reg(0x13, gain_table[index].reg_val);
 
 		// offset the RSSI reading to the rest of the firmware to cancel out the gain adjustments we make
 

@@ -24,6 +24,14 @@
 #include "dcs.h"
 #include "frequencies.h"
 
+enum mod_mode_e {
+	MOD_MODE_FM = 0,
+	MOD_MODE_AM,
+	MOD_MODE_DSB,
+	MOD_MODE_LEN
+};
+typedef enum mod_mode_e mod_mode_t;
+
 enum pwr_on_display_mode_e {
 	PWR_ON_DISPLAY_MODE_FULL_SCREEN = 0,
 	PWR_ON_DISPLAY_MODE_MESSAGE,
@@ -102,15 +110,15 @@ enum {
 #endif
 
 enum alarm_mode_e {
-	ALARM_MODE_SITE = 0,
-	ALARM_MODE_TONE
+	ALARM_MODE_SITE = 0,   // TX
+	ALARM_MODE_TONE        // don't TX
 };
 typedef enum alarm_mode_e alarm_mode_t;
 
 enum roger_mode_e {
 	ROGER_MODE_OFF = 0,
-	ROGER_MODE_ROGER,
-	ROGER_MODE_MDC
+	ROGER_MODE_ROGER1,
+	ROGER_MODE_ROGER2
 };
 typedef enum roger_mode_e roger_mode_t;
 
@@ -191,10 +199,10 @@ typedef struct {
 		uint8_t unused3:2;                   //
 	#endif
 	#if 0
-		uint8_t am_mode:1;                   //  FM/AM
+		uint8_t mod_mode:1;                  //  FM/AM
 		uint8_t unused4:3;                   //
 	#else                          
-		uint8_t am_mode:2;                   //  FM/AM/DSB
+		uint8_t mod_mode:2;                  //  FM/AM/DSB
 		uint8_t unused4:2;                   //
 	#endif
 	// [12]
@@ -418,7 +426,10 @@ typedef struct {
 
 			uint8_t    scan_hold_time;        // ticks we stay paused for on an RX'ed signal when scanning
 
-			uint8_t    unused12[7];           // 0xff's
+			uint8_t    scan_ranges_enable:1;  // enable/disable auto scan ranges
+			uint8_t    unused11g:7;           // 0xff's
+
+			uint8_t    unused12[6];           // 0xff's
 		#endif
 	}  __attribute__((packed)) setting;
 
@@ -570,6 +581,7 @@ void SETTINGS_write_eeprom_config(void);
 void SETTINGS_save_vfo_indices(void);
 void SETTINGS_save(void);
 void SETTINGS_save_channel(const unsigned int channel, const unsigned int vfo, vfo_info_t *p_vfo, const unsigned int mode);
+void SETTINGS_save_chan_name(const unsigned int channel);
 void SETTINGS_save_chan_attribs_name(const unsigned int channel, const vfo_info_t *p_vfo);
 
 unsigned int SETTINGS_find_channel(const uint32_t frequency);

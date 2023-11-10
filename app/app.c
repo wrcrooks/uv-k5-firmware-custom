@@ -80,7 +80,7 @@ const uint8_t orig_pga   = 6;   //  -3dB
 
 static void APP_process_key(const key_code_t Key, const bool key_pressed, const bool key_held);
 
-static void APP_update_rssi(const int vfo)
+static void APP_update_rssi(const int vfo, const bool force)
 {
 	int16_t rssi   = BK4819_GetRSSI();
 	uint8_t glitch = BK4819_GetGlitchIndicator();
@@ -88,11 +88,11 @@ static void APP_update_rssi(const int vfo)
 
 	#ifdef ENABLE_AM_FIX
 		// add RF gain adjust compensation
-		if (g_current_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix)
+		if (g_current_vfo->channel.mod_mode != MOD_MODE_FM && g_eeprom.config.setting.am_fix)
 			rssi -= rssi_gain_diff[vfo];
 	#endif
 
-	if (g_current_rssi[vfo] == rssi)
+	if (g_current_rssi[vfo] == rssi && !force)
 		return;     // no change
 
 	g_current_rssi[vfo]   = rssi;
@@ -100,6 +100,8 @@ static void APP_update_rssi(const int vfo)
 	g_current_noise[vfo]  = noise;
 
 	UI_update_rssi(rssi, glitch, noise, vfo);
+
+	g_update_rssi = false;
 }
 
 static void APP_check_for_new_receive(void)
@@ -115,7 +117,7 @@ static void APP_check_for_new_receive(void)
 		if (g_css_scan_mode != CSS_SCAN_MODE_OFF && g_rx_reception_mode == RX_MODE_NONE)
 		{	// CTCSS/DTS scanning
 
-			g_scan_pause_tick_10ms = scan_pause_code_10ms;
+			g_scan_tick_10ms       = scan_pause_code_10ms;
 			g_scan_pause_time_mode = false;
 			g_rx_reception_mode    = RX_MODE_DETECTED;
 		}
@@ -149,7 +151,7 @@ static void APP_check_for_new_receive(void)
 		if (g_rx_reception_mode != RX_MODE_NONE)
 			goto done;
 
-		g_scan_pause_tick_10ms = scan_pause_chan_10ms;
+		g_scan_tick_10ms       = scan_pause_chan_10ms;
 		g_scan_pause_time_mode = false;
 	}
 
@@ -162,16 +164,16 @@ done:
 
 		#ifdef ENABLE_MDC1200
 		{	// reset the FSK receiver
-			//const uint16_t fsk_reg59 = BK4819_ReadRegister(0x59) & ~((1u << 15) | (1u << 14) | (1u << 12) | (1u << 11));
-			//	BK4819_enable_mdc1200_rx(true);
-			//BK4819_WriteRegister(0x59, (1u << 15) | (1u << 14) | fsk_reg59);
-			//BK4819_WriteRegister(0x59, (1u << 12) | fsk_reg59);
+			//const uint16_t fsk_reg59 = BK4819_read_reg(0x59) & ~((1u << 15) | (1u << 14) | (1u << 12) | (1u << 11));
+			//BK4819_enable_mdc1200_rx(true);
+			//BK4819_write_reg(0x59, (1u << 15) | (1u << 14) | fsk_reg59);
+			//BK4819_write_reg(0x59, (1u << 12) | fsk_reg59);
 		}
 		#endif
 	}
-		APP_update_rssi(g_rx_vfo_num);
-		g_update_rssi = true;
-//	}
+
+	APP_update_rssi(g_rx_vfo_num, true);
+	g_update_rssi = true;
 }
 
 static void APP_process_new_receive(void)
@@ -259,6 +261,9 @@ static void APP_process_rx(void)
 {
 	end_of_rx_mode_t Mode = END_OF_RX_MODE_NONE;
 
+//	APP_update_rssi(g_rx_vfo_num);
+	g_update_rssi = true;
+
 	if (g_flag_tail_tone_elimination_complete)
 	{
 		Mode = END_OF_RX_MODE_END;
@@ -274,7 +279,7 @@ static void APP_process_rx(void)
 				case SCAN_RESUME_TIME:     // stay only for a limited time
 					break;
 				case SCAN_RESUME_CARRIER:  // stay untill the carrier goes away
-					g_scan_pause_tick_10ms = g_eeprom.config.setting.scan_hold_time * 50;
+					g_scan_tick_10ms       = g_eeprom.config.setting.scan_hold_time * 50;
 					g_scan_pause_time_mode = false;
 					break;
 				case SCAN_RESUME_STOP:     // stop scan once we find any signal
@@ -438,7 +443,7 @@ Skip:
 			case SCAN_RESUME_TIME:     // stay only for a limited time
 				break;
 			case SCAN_RESUME_CARRIER:  // stay untill the carrier goes away
-				g_scan_pause_tick_10ms      = g_eeprom.config.setting.scan_hold_time * 50;
+				g_scan_tick_10ms       = g_eeprom.config.setting.scan_hold_time * 50;
 				g_scan_pause_time_mode = false;
 				break;
 			case SCAN_RESUME_STOP:     // stop scan once we find any signal
@@ -484,18 +489,18 @@ bool APP_start_listening(void)
 			case SCAN_RESUME_TIME:
 				if (!g_scan_pause_time_mode)
 				{
-					g_scan_pause_tick_10ms = g_eeprom.config.setting.scan_hold_time * 50;
+					g_scan_tick_10ms       = g_eeprom.config.setting.scan_hold_time * 50;
 					g_scan_pause_time_mode = true;
 				}
 				break;
 
 			case SCAN_RESUME_CARRIER:
-				g_scan_pause_tick_10ms = g_eeprom.config.setting.scan_hold_time * 50;
+				g_scan_tick_10ms       = g_eeprom.config.setting.scan_hold_time * 50;
 				g_scan_pause_time_mode = false;
 				break;
 
 			case SCAN_RESUME_STOP:
-				g_scan_pause_tick_10ms = 0;
+				g_scan_tick_10ms       = 0;
 				g_scan_pause_time_mode = false;
 				break;
 		}
@@ -527,15 +532,15 @@ bool APP_start_listening(void)
 	}
 
 	// AF gain - original QS values
-//	if (g_rx_vfo->channel.am_mode > 0)
+//	if (g_rx_vfo->channel.mod_mode != MOD_MODE_FM)
 //	{
-//		BK4819_WriteRegister(0x48, 0xB3A8);   // 1011 0011 1010 1000
+//		BK4819_write_reg(0x48, 0xB3A8);   // 1011 0011 1010 1000
 //	}
 //	else
 	{
-		BK4819_WriteRegister(0x48,
-			(11u << 12)                        |     // ??? .. 0 ~ 15, doesn't seem to make any difference
-			( 0u << 10)                        |     // AF Rx Gain-1
+		BK4819_write_reg(0x48,
+			(11u << 12)                       |     // ??? .. 0 ~ 15, doesn't seem to make any difference
+			( 0u << 10)                       |     // AF Rx Gain-1
 			(g_eeprom.calib.volume_gain << 4) |     // AF Rx Gain-2
 			(g_eeprom.calib.dac_gain    << 0));     // AF DAC Gain (after Gain-1 and Gain-2)
 	}
@@ -550,18 +555,24 @@ bool APP_start_listening(void)
 	#ifdef ENABLE_VOICE
 		#ifdef MUTE_AUDIO_FOR_VOICE
 			if (g_voice_write_index == 0)
-				AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
+				AUDIO_set_mod_mode(g_rx_vfo->channel.mod_mode);
 		#else
-			AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
+			AUDIO_set_mod_mode(g_rx_vfo->channel.mod_mode);
 		#endif
 	#else
-		AUDIO_set_mod_mode(g_rx_vfo->channel.am_mode);
+		AUDIO_set_mod_mode(g_rx_vfo->channel.mod_mode);
+	#endif
+
+	#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+		UART_printf("mode %u\r\n", g_rx_vfo->channel.mod_mode);
 	#endif
 
 	GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER);
 
 	if (g_current_display_screen != DISPLAY_MENU)
 		GUI_SelectNextDisplay(DISPLAY_MAIN);
+
+	APP_update_rssi(g_rx_vfo_num, true);
 
 	g_update_status  = true;
 	g_update_display = true;
@@ -579,7 +590,7 @@ void APP_stop_scan(void)
 	g_scan_state_dir = SCAN_STATE_DIR_OFF;
 
 	if (g_scan_pause_time_mode ||
-		g_scan_pause_tick_10ms > (200 / 10) ||
+		g_scan_tick_10ms > (200 / 10) ||
 		g_monitor_enabled ||
 	    g_current_function == FUNCTION_RECEIVE ||
 	    g_current_function == FUNCTION_NEW_RECEIVE)
@@ -593,7 +604,7 @@ void APP_stop_scan(void)
 	{	// revert to where we were when starting the scan
 
 		if (g_scan_next_channel <= USER_CHANNEL_LAST)
-		{	// we were channel hopping
+		{	// we were channel scanning
 
 			if (g_scan_restore_channel != 0xff)
 			{
@@ -601,7 +612,7 @@ void APP_stop_scan(void)
 				g_eeprom.config.setting.indices.vfo[g_rx_vfo_num].screen = g_scan_restore_channel;
 
 				RADIO_configure_channel(g_rx_vfo_num, VFO_CONFIGURE_RELOAD);
-
+				RADIO_ConfigureSquelch(g_rx_vfo);
 				RADIO_setup_registers(true);
 			}
 		}
@@ -615,7 +626,7 @@ void APP_stop_scan(void)
 			g_rx_vfo->freq_in_channel = SETTINGS_find_channel(g_rx_vfo->freq_config_rx.frequency);
 
 			RADIO_ApplyOffset(g_rx_vfo, false);
-			RADIO_ConfigureSquelchAndOutputPower(g_rx_vfo);
+			RADIO_ConfigureSquelch(g_rx_vfo);
 			RADIO_setup_registers(true);
 		}
 
@@ -627,7 +638,7 @@ void APP_stop_scan(void)
 		if (g_rx_vfo->channel_save > USER_CHANNEL_LAST)
 		{	// frequency mode
 			RADIO_ApplyOffset(g_rx_vfo, false);
-			RADIO_ConfigureSquelchAndOutputPower(g_rx_vfo);
+			RADIO_ConfigureSquelch(g_rx_vfo);
 			SETTINGS_save_channel(g_rx_vfo->channel_save, g_rx_vfo_num, g_rx_vfo, 1);
 			return;
 		}
@@ -639,7 +650,7 @@ void APP_stop_scan(void)
 		g_another_voice_id = VOICE_ID_SCANNING_STOP;
 	#endif
 
-	g_scan_pause_tick_10ms      = 0;
+	g_scan_tick_10ms      = 0;
 	g_scan_pause_time_mode = false;
 
 	g_update_status = true;
@@ -647,33 +658,32 @@ void APP_stop_scan(void)
 
 static void APP_next_freq(void)
 {
-	uint32_t               freq  = g_rx_vfo->freq_config_rx.frequency;
-	const uint32_t         step  = g_rx_vfo->step_freq;
-	const frequency_band_t band  = FREQUENCY_GetBand(freq);
-	const uint32_t         upper = FREQ_BAND_TABLE[band].upper;
-	const uint32_t         lower = FREQ_BAND_TABLE[band].lower;
+	uint32_t freq = g_tx_vfo->freq_config_rx.frequency;
 
 	#ifdef ENABLE_SCAN_IGNORE_LIST
 		do {
 	#endif
-			freq += step * g_scan_state_dir;
+			freq += g_scan_initial_step_size * g_scan_state_dir;
 
 			// wrap-a-round
-			while (freq >= upper)
-				freq -= upper - lower;
-			while (freq < lower)
-				freq += upper - lower;
+			while (freq >= g_scan_initial_upper)
+				freq -= g_scan_initial_upper - g_scan_initial_lower;
+			while (freq < g_scan_initial_lower)
+				freq += g_scan_initial_upper - g_scan_initial_lower;
 
-			if (band == BAND2_108MHz)  // air band uses set channels
-				freq = lower + ((((freq - lower) + (step / 2)) / step) * step);
+			// round
+			#ifdef ENABLE_SCAN_RANGES
+				if (g_eeprom.config.setting.scan_ranges_enable)
+					freq = g_scan_initial_lower + ((((freq - g_scan_initial_lower) + (g_scan_initial_step_size / 2)) / g_scan_initial_step_size) * g_scan_initial_step_size);
+			#endif
 
 	#ifdef ENABLE_SCAN_IGNORE_LIST
 		} while (FI_freq_ignored(freq) >= 0);
 	#endif
 
-	g_rx_vfo->freq_in_channel = 0xff;
+	g_tx_vfo->freq_in_channel = 0xff;
 
-	g_rx_vfo->freq_config_rx.frequency = freq;
+	g_tx_vfo->freq_config_rx.frequency = freq;
 
 	#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
 //		UART_printf("APP_next_freq %u %u\r\n", freq, new_band);
@@ -682,30 +692,30 @@ static void APP_next_freq(void)
 	#if 0
 		// original slower method
 
-		RADIO_ApplyOffset(g_rx_vfo, false);
-		RADIO_ConfigureSquelchAndOutputPower(g_rx_vfo);
-
+		RADIO_ApplyOffset(g_tx_vfo, false);
+//		RADIO_ConfigureSquelch(g_tx_vfo);
 		RADIO_setup_registers(true);
 
 		#ifdef ENABLE_FASTER_CHANNEL_SCAN
-			g_scan_pause_tick_10ms = 10;   // 100ms
+			g_scan_tick_10ms = 10;   // 100ms
 		#else
-			g_scan_pause_tick_10ms = scan_pause_freq_10ms;
+			g_scan_tick_10ms = scan_pause_freq_10ms;
 		#endif
 
 	#else
 		// don't need to go through all the other stuff .. speed things up !!
 
-//		RADIO_ApplyOffset(g_rx_vfo, false);
+		BK4819_set_rf_frequency(g_tx_vfo->freq_config_rx.frequency, true);
+		BK4819_set_rf_filter_path(g_tx_vfo->freq_config_rx.frequency);
 
-		BK4819_set_rf_frequency(g_rx_vfo->freq_config_rx.frequency, true);
-		BK4819_set_rf_filter_path(g_rx_vfo->freq_config_rx.frequency);
+		RADIO_ApplyOffset(g_tx_vfo, false);
+//		RADIO_ConfigureSquelch(g_tx_vfo);
 
 		#ifdef ENABLE_FASTER_CHANNEL_SCAN
-			//g_scan_pause_tick_10ms = 10;   // 100ms
-			g_scan_pause_tick_10ms = 6;    // 60ms
+			//g_scan_tick_10ms = 10;   // 100ms
+			g_scan_tick_10ms = 7;      // 70ms
 		#else
-			g_scan_pause_tick_10ms = scan_pause_freq_10ms;
+			g_scan_tick_10ms = scan_pause_freq_10ms;
 		#endif
 
 	#endif
@@ -733,7 +743,7 @@ static void APP_next_channel(void)
 
 				if (chan1 >= 0)
 				{
-					if (RADIO_CheckValidChannel(chan1, false, 0))
+					if (RADIO_channel_valid(chan1, false, 0))
 					{
 						g_scan_current_scan_list = SCAN_NEXT_CHAN_SCANLIST1;
 						g_scan_next_channel      = chan1;
@@ -746,7 +756,7 @@ static void APP_next_channel(void)
 			case SCAN_NEXT_CHAN_SCANLIST2:
 				if (chan2 >= 0)
 				{
-					if (RADIO_CheckValidChannel(chan2, false, 0))
+					if (RADIO_channel_valid(chan2, false, 0))
 					{
 						g_scan_current_scan_list = SCAN_NEXT_CHAN_SCANLIST2;
 						g_scan_next_channel      = chan2;
@@ -805,16 +815,15 @@ static void APP_next_channel(void)
 		g_eeprom.config.setting.indices.vfo[g_rx_vfo_num].screen = g_scan_next_channel;
 
 		RADIO_configure_channel(g_rx_vfo_num, VFO_CONFIGURE_RELOAD);
-
 		RADIO_setup_registers(true);
 
 		g_update_display = true;
 	}
 
 	#ifdef ENABLE_FASTER_CHANNEL_SCAN
-		g_scan_pause_tick_10ms = 9;  // 90ms .. <= ~60ms it misses signals (squelch response and/or PLL lock time) ?
+		g_scan_tick_10ms = 9;  // 90ms .. <= ~60ms it misses signals (squelch response and/or PLL lock time) ?
 	#else
-		g_scan_pause_tick_10ms = scan_pause_chan_10ms;
+		g_scan_tick_10ms = scan_pause_chan_10ms;
 	#endif
 
 	g_scan_pause_time_mode = false;
@@ -856,7 +865,7 @@ static bool APP_toggle_dual_watch_vfo(void)
 		return false;
 
 	#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-		UART_SendText("dual wot\r\n");
+//		UART_SendText("dual wot\r\n");
 	#endif
 
 	#ifdef ENABLE_NOAA
@@ -901,12 +910,12 @@ void APP_process_radio_interrupts(void)
 
 		uint16_t int_bits;
 
-		const uint16_t reg_c = BK4819_ReadRegister(0x0C);
+		const uint16_t reg_c = BK4819_read_reg(0x0C);
 		if ((reg_c & 1u) == 0)
 			break;
 
-		BK4819_WriteRegister(0x02, 0);
-		int_bits = BK4819_ReadRegister(0x02);
+		BK4819_write_reg(0x02, 0);
+		int_bits = BK4819_read_reg(0x02);
 
 		#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
 			#ifdef ENABLE_AIRCOPY
@@ -1066,7 +1075,7 @@ void APP_process_radio_interrupts(void)
 				UART_SendText("sq close\r\n");
 			#endif
 
-			//APP_update_rssi(g_rx_vfo);
+			//APP_update_rssi(g_rx_vfo_num, false);
 			g_update_rssi = true;
 
 			g_update_display = true;
@@ -1080,7 +1089,7 @@ void APP_process_radio_interrupts(void)
 				UART_SendText("sq open\r\n");
 			#endif
 
-			//APP_update_rssi(g_rx_vfo_num);
+			//APP_update_rssi(g_rx_vfo_num, false);
 			g_update_rssi = true;
 
 			if (g_monitor_enabled)
@@ -1099,6 +1108,8 @@ void APP_end_tx(void)
 {	// back to RX mode
 
 	RADIO_tx_eot();
+
+	ST7565_Init(false);
 
 	if (g_current_vfo->p_tx->code_type != CODE_TYPE_NONE)
 	{	// CTCSS/CDCSS is enabled
@@ -1390,8 +1401,8 @@ void APP_check_keys(void)
 		{	// only the up and down keys are made repeatable
 
 			// key repeat max 10ms speed if user is moving up/down in freq/channel
-			const bool freq_chan = IS_FREQ_CHANNEL(g_eeprom.config.setting.indices.vfo[g_eeprom.config.setting.tx_vfo_num].screen);
-			const uint8_t repeat_10ms = (g_manual_scanning && g_monitor_enabled && freq_chan && g_current_display_screen == DISPLAY_MAIN) ? 1 : key_repeat_10ms;
+			const bool    freq_chan   = IS_FREQ_CHANNEL(g_eeprom.config.setting.indices.vfo[g_eeprom.config.setting.tx_vfo_num].screen);
+			const uint8_t repeat_10ms = (g_manual_scanning && g_monitor_enabled && freq_chan && g_current_display_screen == DISPLAY_MAIN) ? 2 : key_repeat_10ms;
 
 			if (++g_key_debounce_repeat >= (key_long_press_10ms + repeat_10ms))
 			{	// key repeat
@@ -1518,7 +1529,7 @@ void APP_channel_next(const bool remember_current, const scan_state_dir_t scan_d
 		return;
 	}
 
-	g_scan_pause_tick_10ms      = scan_pause_css_10ms;
+	g_scan_tick_10ms       = scan_pause_css_10ms;
 	g_scan_pause_time_mode = false;
 	g_rx_reception_mode    = RX_MODE_NONE;
 }
@@ -1553,7 +1564,7 @@ void APP_process_flash_light_10ms(void)
 						GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
 						#ifdef ENABLE_FLASH_LIGHT_SOS_TONE
 							if (!g_squelch_open && !g_monitor_enabled && !GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER))
-								BK4819_StartTone1(880, 50, g_current_function == FUNCTION_TRANSMIT);
+								BK4819_start_tone(880, 70, g_current_function == FUNCTION_TRANSMIT, false);
 						#endif
 					}
 				}
@@ -1564,7 +1575,7 @@ void APP_process_flash_light_10ms(void)
 						GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT); // OFF
 						#ifdef ENABLE_FLASH_LIGHT_SOS_TONE
 							if (!g_squelch_open && !g_monitor_enabled && GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_SPEAKER))
-								BK4819_StopTones(g_current_function == FUNCTION_TRANSMIT);
+								BK4819_stop_tones(g_current_function == FUNCTION_TRANSMIT);
 						#endif
 					}
 				}
@@ -1593,7 +1604,7 @@ void APP_process_scan(void)
 			APP_start_listening();
 		}
 		else
-		if (g_scan_pause_tick_10ms == 0)
+		if (g_scan_tick_10ms == 0)
 		{	// switch to next channel
 			g_scan_pause_time_mode = false;
 			g_rx_reception_mode    = RX_MODE_NONE;
@@ -1638,7 +1649,7 @@ void APP_process_scan(void)
 
 	}
 
-	if (g_css_scan_mode == CSS_SCAN_MODE_SCANNING && g_scan_pause_tick_10ms == 0)
+	if (g_css_scan_mode == CSS_SCAN_MODE_SCANNING && g_scan_tick_10ms == 0)
 		MENU_SelectNextCode();
 
 	#ifdef ENABLE_NOAA
@@ -1723,6 +1734,7 @@ void APP_process_transmit(void)
 					g_alarm_state = ALARM_STATE_ALARM;
 
 					RADIO_enable_CxCSS_tail();
+					RADIO_ConfigureTXPower(g_tx_vfo);
 					BK4819_SetupPowerAmplifier(0, 0);
 					BK4819_set_GPIO_pin(BK4819_GPIO1_PIN29_PA_ENABLE, false);   // PA off
 					BK4819_Enable_AfDac_DiscMode_TxDsp();
@@ -1882,7 +1894,7 @@ void APP_process_power_save(void)
 		g_update_rssi)
 	{	// go back to sleep
 
-		APP_update_rssi(g_rx_vfo_num);
+		APP_update_rssi(g_rx_vfo_num, false);
 
 		// go back to sleep
 
@@ -1942,6 +1954,20 @@ void APP_time_slice_500ms(void)
 		return;
 	}
 
+	if (g_current_function == FUNCTION_TRANSMIT)
+	{
+		if (g_tx_timer_tick_500ms < 6)
+		{	// <= 3 seconds left
+			if (g_tx_timer_tick_500ms & 1u)
+				BK4819_start_tone(880, 10, true, true);
+			else
+				BK4819_stop_tones(true);
+		}
+
+		if (g_tx_timer_tick_500ms & 1u)
+			g_update_display = true;
+	}
+
 	if (g_update_screen_tick_500ms > 0)
 	{	// update display once every 500ms
 		if (--g_update_screen_tick_500ms == 0)
@@ -1984,9 +2010,6 @@ void APP_time_slice_500ms(void)
 			}
 		}
 	}
-
-	if (g_current_function == FUNCTION_TRANSMIT && (g_tx_timer_tick_500ms & 1u))
-		g_update_display = true;
 
 	if (g_menu_tick_10ms > 0)
 		if (--g_menu_tick_10ms == 0)
@@ -2141,7 +2164,7 @@ void APP_time_slice_500ms(void)
 	}
 
 	if (g_current_function != FUNCTION_POWER_SAVE && g_current_function != FUNCTION_TRANSMIT)
-		APP_update_rssi(g_rx_vfo_num);
+		APP_update_rssi(g_rx_vfo_num, false);
 
 	if (g_low_battery)
 	{
@@ -2280,75 +2303,6 @@ void APP_time_slice_10ms(void)
 {
 	g_flash_light_blink_tick_10ms++;
 
-	#ifdef ENABLE_AIRCOPY
-		if (g_current_display_screen == DISPLAY_AIRCOPY)
-		{	// we're in AIRCOPY mode
-
-			if (g_aircopy_state == AIRCOPY_TX)
-				AIRCOPY_process_fsk_tx_10ms();
-
-			AIRCOPY_process_fsk_rx_10ms();
-
-			APP_check_keys();
-
-			if (g_update_display)
-				GUI_DisplayScreen();
-
-			if (g_update_status)
-				UI_DisplayStatus(false);
-
-			return;
-		}
-	#endif
-
-	#ifdef ENABLE_UART
-		if (UART_IsCommandAvailable())
-		{
-			__disable_irq();
-			UART_HandleCommand();
-			__enable_irq();
-		}
-	#endif
-
-	if (g_current_function == FUNCTION_TRANSMIT && (g_tx_timeout_reached || g_serial_config_tick_500ms > 0))
-	{	// transmitter timed out or must de-key
-
-		g_tx_timeout_reached = false;
-		g_flag_end_tx        = true;
-
-		APP_end_tx();
-
-		AUDIO_PlayBeep(BEEP_880HZ_60MS_TRIPLE_BEEP);
-
-		RADIO_set_vfo_state(VFO_STATE_TIMEOUT);
-
-		GUI_DisplayScreen();
-	}
-
-	#ifdef ENABLE_UART
-		if (g_serial_config_tick_500ms > 0)
-		{	// config upload/download is running
-			if (g_update_display)
-				GUI_DisplayScreen();
-			if (g_update_status)
-				UI_DisplayStatus(false);
-			return;
-		}
-	#endif
-
-	#ifdef ENABLE_AM_FIX
-		if (g_rx_vfo->channel.am_mode > 0 && g_eeprom.config.setting.am_fix)
-			AM_fix_10ms(g_rx_vfo_num);
-	#endif
-
-	#ifdef ENABLE_FMRADIO
-		if (g_flag_save_fm)
-		{
-			SETTINGS_save_fm();
-			g_flag_save_fm = false;
-		}
-	#endif
-
 	if (g_flag_save_vfo)
 	{
 		SETTINGS_save_vfo_indices();
@@ -2360,6 +2314,36 @@ void APP_time_slice_10ms(void)
 		SETTINGS_save();
 		g_flag_save_settings = false;
 	}
+
+	if (g_request_display_screen != DISPLAY_INVALID)
+	{
+		GUI_SelectNextDisplay(g_request_display_screen);
+		g_request_display_screen = DISPLAY_INVALID;
+	}
+
+	// 1of11
+	if (g_update_rssi)
+		APP_update_rssi(g_rx_vfo_num, false);
+
+	if (g_update_display)
+		GUI_DisplayScreen();
+
+	if (g_update_status)
+		UI_DisplayStatus(false);
+
+	#ifdef ENABLE_AIRCOPY
+		if (g_current_display_screen == DISPLAY_AIRCOPY)
+		{	// we're in AIRCOPY mode
+
+			if (g_aircopy_state == AIRCOPY_TX)
+				AIRCOPY_process_fsk_tx_10ms();
+
+			AIRCOPY_process_fsk_rx_10ms();
+
+			APP_check_keys();
+			return;
+		}
+	#endif
 
 	if (g_flag_save_channel)
 	{
@@ -2376,16 +2360,54 @@ void APP_time_slice_10ms(void)
 		GUI_SelectNextDisplay(DISPLAY_MAIN);
 	}
 
+	#ifdef ENABLE_UART
+		if (UART_IsCommandAvailable())
+		{
+			__disable_irq();
+			UART_HandleCommand();
+			__enable_irq();
+		}
+	#endif
+
+	if (g_current_function == FUNCTION_TRANSMIT && (g_tx_timeout_reached || g_serial_config_tick_500ms > 0))
+	{	// transmitter timed out or must de-key
+
+		BK4819_stop_tones(true);
+
+		g_tx_timeout_reached = false;
+		g_flag_end_tx        = true;
+
+		APP_end_tx();
+
+		AUDIO_PlayBeep(BEEP_880HZ_60MS_TRIPLE_BEEP);
+
+		RADIO_set_vfo_state(VFO_STATE_TIMEOUT);
+
+		GUI_DisplayScreen();
+	}
+
+	#ifdef ENABLE_UART
+		if (g_serial_config_tick_500ms > 0)
+			return;
+	#endif
+
+	#ifdef ENABLE_AM_FIX
+		if (g_rx_vfo->channel.mod_mode != MOD_MODE_FM && g_eeprom.config.setting.am_fix)
+			AM_fix_10ms(g_rx_vfo_num);
+	#endif
+
+	#ifdef ENABLE_FMRADIO
+		if (g_flag_save_fm)
+		{
+			SETTINGS_save_fm();
+			g_flag_save_fm = false;
+		}
+	#endif
+
 	if (g_reduced_service || g_serial_config_tick_500ms > 0)
 	{
 		if (g_current_function == FUNCTION_TRANSMIT)
 			g_tx_timeout_reached = true;
-
-		if (g_update_display)
-			GUI_DisplayScreen();
-
-		if (g_update_status)
-			UI_DisplayStatus(false);
 
 		return;
 	}
@@ -2417,12 +2439,6 @@ void APP_time_slice_10ms(void)
 			AUDIO_PlayQueuedVoice();
 		}
 	#endif
-
-	if (g_update_display)
-		GUI_DisplayScreen();
-
-	if (g_update_status)
-		UI_DisplayStatus(false);
 
 	APP_process_flash_light_10ms();
 
@@ -2949,9 +2965,4 @@ Skip:
 			g_another_voice_id = VOICE_ID_INVALID;
 		}
 	#endif
-
-	GUI_SelectNextDisplay(g_request_display_screen);
-
-	g_request_display_screen = DISPLAY_INVALID;
-	g_update_display         = true;
 }
