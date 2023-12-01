@@ -67,8 +67,7 @@ void     BK4819_write_reg(const uint8_t Register, uint16_t Data);
 void     BK4819_write_8(uint8_t Data);
 void     BK4819_write_16(uint16_t Data);
 
-void     BK4819_EnableAFC(void);
-void     BK4819_DisableAFC(void);
+void     BK4819_set_AFC(unsigned int level);
 
 void     BK4819_DisableAGC(void);
 void     BK4819_EnableAGC(void);
@@ -80,7 +79,7 @@ void     BK4819_set_CTCSS_freq(const uint32_t control_word);
 void     BK4819_set_tail_detection(const uint32_t freq_10Hz);
 void     BK4819_EnableVox(uint16_t Vox1Threshold, uint16_t Vox0Threshold);
 
-void     BK4819_set_TX_deviation(const bool narrow);
+void     BK4819_set_TX_deviation(uint16_t deviation);
 
 void     BK4819_SetFilterBandwidth(const BK4819_filter_bandwidth_t Bandwidth);
 

@@ -39,6 +39,9 @@
 	#include "freq_ignore.h"
 #endif
 #include "misc.h"
+#ifdef ENABLE_PANADAPTER
+	#include "panadapter.h"
+#endif
 #include "radio.h"
 #include "settings.h"
 #include "ui/inputbox.h"
@@ -75,9 +78,7 @@ void toggle_chan_scanlist(void)
 		return;
 	}
 
-	if (g_current_display_screen != DISPLAY_MAIN     ||
-		g_current_function == FUNCTION_TRANSMIT ||
-		g_current_function == FUNCTION_PANADAPTER)
+	if (g_current_display_screen != DISPLAY_MAIN || g_current_function == FUNCTION_TRANSMIT)
 	{
 		g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
 		return;
@@ -137,11 +138,12 @@ void toggle_chan_scanlist(void)
 			const unsigned int channel = FREQ_CHANNEL_FIRST + g_vfo_info[vfo].channel_attributes.band;
 
 			g_eeprom.config.setting.indices.vfo[vfo].screen = channel;
-			g_vfo_info[vfo].channel_save        = channel;
-			g_eeprom.config.setting.tx_vfo_num = vfo;
+			g_vfo_info[vfo].channel_save                    = channel;
+//			g_eeprom.config.setting.tx_vfo_num              = vfo;
 
 			RADIO_select_vfos();
-			RADIO_ApplyOffset(g_tx_vfo, false);
+			RADIO_apply_offset(g_tx_vfo, false);
+
 			RADIO_ConfigureSquelch(g_tx_vfo);
 //			RADIO_ConfigureTXPower(g_tx_vfo);
 			RADIO_setup_registers(true);
@@ -149,10 +151,10 @@ void toggle_chan_scanlist(void)
 			// find the first channel that contains this frequency
 			g_tx_vfo->freq_in_channel = SETTINGS_find_channel(g_tx_vfo->freq_config_tx.frequency);
 
-			SETTINGS_save_channel(g_tx_vfo->channel_save, g_eeprom.config.setting.tx_vfo_num, g_tx_vfo, 1);
+			SETTINGS_save_channel(channel, vfo, g_tx_vfo, 2);
 
 			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-				UART_printf("chan-vfo %u\r\n", g_tx_vfo->channel_save);
+//				UART_printf("chan-vfo %u\r\n", channel);
 			#endif
 
 			g_beep_to_play = BEEP_880HZ_60MS_TRIPLE_BEEP;
@@ -182,11 +184,11 @@ void toggle_chan_scanlist(void)
 			if (chan <= USER_CHANNEL_LAST)
 			{
 				#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-					UART_printf("vfo to mem %u\r\n", chan);
+//					UART_printf("vfo to mem %u\r\n", chan);
 				#endif
 
 				g_sub_menu_selection = chan;
-				g_flag_refresh_menu  = false;
+				g_update_menu  = false;
 				g_current_display_screen  = DISPLAY_MENU;
 				g_update_display     = false;
 				UI_DisplayMenu();
@@ -280,6 +282,10 @@ void processFKeyFunction(const key_code_t Key)
 
 			g_request_display_screen = DISPLAY_MAIN;
 
+			#ifdef ENABLE_PANADAPTER
+				PAN_restart(true);
+			#endif
+
 			break;
 
 		case KEY_2:   // A/B
@@ -359,6 +365,16 @@ void processFKeyFunction(const key_code_t Key)
 			break;
 
 		case KEY_5:    // NOAA
+
+			#ifdef ENABLE_PANADAPTER
+				if (g_fkey_pressed)
+				{
+					g_fkey_pressed = false;
+					g_eeprom.config.setting.panadapter = (g_eeprom.config.setting.panadapter + 1) & 1u;
+					g_request_save_settings = true;
+					break;
+				}
+			#endif
 
 			#ifdef ENABLE_NOAA
 
@@ -552,6 +568,10 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 		g_request_save_vfo            = true;
 		g_vfo_configure_mode          = VFO_CONFIGURE_RELOAD;
 
+		#ifdef ENABLE_PANADAPTER
+			PAN_restart(true);
+		#endif
+
 		g_update_display = true;
 		return;
 	}
@@ -562,10 +582,6 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 		uint32_t freq;
 
 		NUMBER_Get(g_input_box, &freq);
-
-	#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-//		UART_printf("key3 %u %u\r\n", freq, g_input_box_index);
-	#endif
 
 //		if (g_input_box_index < 6)
 //		if (g_input_box_index < 7)
@@ -629,6 +645,10 @@ void MAIN_Key_DIGITS(key_code_t Key, bool key_pressed, bool key_held)
 
 			g_request_save_channel = 1;
 			g_vfo_configure_mode   = VFO_CONFIGURE;
+
+			#ifdef ENABLE_PANADAPTER
+				PAN_restart(true);
+			#endif
 
 			g_update_display = true;
 			return;
@@ -820,7 +840,7 @@ void MAIN_Key_MENU(const bool key_pressed, const bool key_held)
 
 		if (flag)
 		{
-			g_flag_refresh_menu = true;
+			g_update_menu = true;
 			g_request_display_screen = DISPLAY_MENU;
 
 			#ifdef ENABLE_VOICE
@@ -873,7 +893,8 @@ void MAIN_Key_STAR(bool key_pressed, bool key_held)
 			#ifdef ENABLE_SCAN_IGNORE_LIST
 				if (scanning_paused())
 				{
-					FI_add_freq_ignored(g_rx_vfo->freq_config_rx.frequency);
+					if (!FI_add_freq_ignored(g_rx_vfo->freq_config_rx.frequency))
+						g_beep_to_play = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;  // not added for some reason
 
 					// immediately continue the scan
 					g_scan_tick_10ms = 0;
@@ -962,7 +983,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 
 			SETTINGS_save_channel(g_tx_vfo->channel_save, g_eeprom.config.setting.tx_vfo_num, g_tx_vfo, 1);
 
-			RADIO_ApplyOffset(g_tx_vfo, true);
+			RADIO_apply_offset(g_tx_vfo, true);
 
 			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
 //				UART_printf("save chan %u\r\n", g_rx_vfo->channel_save);
@@ -1015,11 +1036,11 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 			if (IS_FREQ_CHANNEL(Channel))
 			{	// frequency mode
 
-				uint32_t freq = g_tx_vfo->freq_config_rx.frequency;
+				uint32_t               freq = g_tx_vfo->freq_config_rx.frequency;
+				const frequency_band_t band = FREQUENCY_GetBand(freq);
 
 				if (key_pressed && !key_held)
 				{	// just pressed
-					const frequency_band_t band  = FREQUENCY_GetBand(freq);
 
 					g_scan_initial_upper     = FREQ_BAND_TABLE[band].upper;
 					g_scan_initial_lower     = FREQ_BAND_TABLE[band].lower;
@@ -1027,15 +1048,18 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 
 					#ifdef ENABLE_SCAN_RANGES
 						//if (g_eeprom.config.setting.scan_ranges_enable)
+						//{
 						//	FREQUENCY_scan_range(freq, &g_scan_initial_lower, &g_scan_initial_upper, &g_scan_initial_step_size);
+						//	freq = FREQUENCY_floor_to_step(freq, g_scan_initial_step_size, g_scan_initial_lower, g_scan_initial_upper);
+						//}
 					#endif
 				}
 
 				freq += g_scan_initial_step_size * direction;
 
 				// wrap-a-round
-				if (key_held)
-				{	// key is held down
+//				if (key_held)
+				{
 					while (freq >= g_scan_initial_upper)
 						freq -= g_scan_initial_upper - g_scan_initial_lower;
 					while (freq < g_scan_initial_lower)
@@ -1045,8 +1069,12 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 				// round
 				#ifdef ENABLE_SCAN_RANGES
 					//if (key_held)
-					//	freq = g_scan_initial_lower + ((((freq - g_scan_initial_lower) + (g_scan_initial_step_size / 2)) / g_scan_initial_step_size) * g_scan_initial_step_size);
+					//	//freq = g_scan_initial_lower + ((((freq - g_scan_initial_lower) + (g_scan_initial_step_size / 2)) / g_scan_initial_step_size) * g_scan_initial_step_size);
+					//	freq = FREQUENCY_floor_to_step(freq, g_scan_initial_step_size, g_scan_initial_lower, g_scan_initial_upper);
 				#endif
+
+				if (band == BAND2_108MHz)   // cope with the 8.333kHz step size
+					freq = FREQUENCY_floor_to_step(freq, g_scan_initial_step_size, g_scan_initial_lower, g_scan_initial_upper);
 
 				if (FREQUENCY_rx_freq_check(freq) < 0)
 				{	// frequency not allowed
@@ -1065,7 +1093,7 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 					g_tx_vfo->freq_in_channel = 0xff;
 
 				#if 0
-					RADIO_ApplyOffset(g_tx_vfo, false);
+					RADIO_apply_offset(g_tx_vfo, false);
 					RADIO_ConfigureSquelch(g_tx_vfo);
 //					RADIO_ConfigureTXPower(g_tx_vfo);
 
@@ -1088,10 +1116,14 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 						}
 					#endif
 
+					#ifdef ENABLE_PANADAPTER
+						PAN_restart(false);
+					#endif
+
 					BK4819_set_rf_frequency(freq, true);  // set the VCO/PLL
 					BK4819_set_rf_filter_path(freq);      // set the proper LNA/PA filter path
 
-					RADIO_ApplyOffset(g_tx_vfo, false);
+					RADIO_apply_offset(g_tx_vfo, false);
 					RADIO_ConfigureSquelch(g_tx_vfo);
 //					RADIO_ConfigureTXPower(g_tx_vfo);
 				#endif
@@ -1102,6 +1134,10 @@ void MAIN_Key_UP_DOWN(bool key_pressed, bool key_held, scan_state_dir_t directio
 			// channel mode
 
 			g_tx_vfo->freq_in_channel = 0xff;
+
+			#ifdef ENABLE_PANADAPTER
+				PAN_restart(true);
+			#endif
 
 			Next = RADIO_FindNextChannel(Channel + direction, direction, false, 0);
 			if (Next == 0xFF)

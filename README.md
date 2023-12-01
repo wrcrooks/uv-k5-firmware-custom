@@ -56,7 +56,6 @@ ENABLE_VOICE                     := 0       want to hear voices ?
 ENABLE_MUTE_RADIO_FOR_VOICE      := 1       mute the radios audio when a voice is playing
 ENABLE_VOX                       := 0       voice operated transmission
 ENABLE_VOX_MORE_SENSITIVE        := 1       make VOX more sensitive
-ENABLE_REDUCE_LOW_MID_TX_POWER   := 1       reduce the low and mid TX power levels (high remains unchanged)
 ENABLE_ALARM                     := 0       TX alarms
 ENABLE_1750HZ                    := 0       side key 1750Hz TX tone (older style repeater access)
 ENABLE_MDC1200                   := 0       enable MDC1200 TX/RX + menu TX option
@@ -65,13 +64,17 @@ ENABLE_MDC1200_SIDE_BEEP         := 1       enable short side tone/beep when MDC
 ENABLE_PWRON_PASSWORD            := 0       include power-on password code
 ENABLE_RESET_AES_KEY             := 1       '1' = reset/clear the AES key stored in the eeprom (only if it's set)
 ENABLE_BIG_FREQ                  := 0       big font frequencies (like original QS firmware)
+ENABLE_DTMF_LIVE_DECODER         := 0       enable the live DTMF display/decoder .. adds a menu option
 ENABLE_SHOW_FREQS_CHAN           := 1       show the channel name under the frequency if the frequency is found in a channel
 ENABLE_SMALL_BOLD                := 1       bold channel name/no. (when name + freq channel display mode)
 ENABLE_TRIM_TRAILING_ZEROS       := 1       trim away any trailing zeros on frequencies
 ENABLE_WIDE_RX                   := 1       full 18MHz to 1300MHz RX (though front-end/PA not designed for full range)
 ENABLE_TX_WHEN_AM                := 0       allow TX (always FM) when RX is set to AM
-ENABLE_F_CAL_MENU                := 0       enable/disable the radios hidden frequency calibration menu
-ENABLE_TX_UNLOCK                 := 0       allow TX everywhere EXCEPT airband (108~137) .. TX harmonic content will cause interference to other services, do so entirely at your own risk !
+ENABLE_F_CAL_MENU                := 0       enable frequency calibration hidden menu
+ENABLE_FM_DEV_CAL_MENU           := 0       enable FM deviation calibration hidden menu
+ENABLE_TX_UNLOCK_MENU            := 0       allow TX everywhere EXCEPT airband (108~137) .. TX harmonic content will cause interference to other services, do so entirely at your own risk !
+ENABLE_TX_POWER_CAL_MENU         := 0       used to compute the TX power register values .. leave at '0'
+ENABLE_TX_POWER_FIX              := 1       fix the TX output power, L ~ 10mW, M ~ 500mW, H ~ 4W, U ~ user settable
 ENABLE_CTCSS_TAIL_PHASE_SHIFT    := 0       standard CTCSS tail phase shift rather than QS's own 55Hz tone method
 ENABLE_CONTRAST                  := 0       add contrast menu
 ENABLE_BOOT_BEEPS                := 0       gives user audio feedback on volume knob position at boot-up
@@ -82,7 +85,7 @@ ENABLE_REVERSE_BAT_SYMBOL        := 1       mirror the battery symbol on the sta
 ENABLE_FREQ_SEARCH_LNA           := 0       keep this disabled
 ENABLE_FREQ_SEARCH_TIMEOUT       := 0       timeout if FREQ not found when using F+4 search function
 ENABLE_CODE_SEARCH_TIMEOUT       := 0       timeout if CTCSS/CDCSS not found when using F+* search function
-ENABLE_SCAN_IGNORE_LIST          := 1       ignore selected frequencies when scanning - add freqs to list with short */scan button when scanning, remove freq from list with long press MENU when not scanning
+ENABLE_SCAN_IGNORE_LIST          := 1       ignore selected frequencies when scanning - add freqs to list with short */scan button when freq scanning, remove freq from list with long press MENU when not scanning
 ENABLE_SCAN_RANGES               := 0       adds menu option to auto select frequency scan range/step depending on your initial frequency
 ENABLE_KILL_REVIVE               := 0       include kill and revive code
 ENABLE_AM_FIX                    := 1       dynamically adjust the front end gains when in AM mode to help prevent AM demodulator saturation, ignore the on-screen RSSI level (for now)
@@ -91,23 +94,27 @@ ENABLE_SQUELCH_MORE_SENSITIVE    := 1       make squelch levels a little bit mor
 ENABLE_SQ_OPEN_WITH_UP_DN_BUTTS  := 1       open the squelch when holding down UP or DN buttons when in frequency mode
 ENABLE_FASTER_CHANNEL_SCAN       := 1       increase the channel scan speed, but also make the squelch more twitchy
 ENABLE_COPY_CHAN_TO_VFO_TO_CHAN  := 1       long press M, copy channel to VFO, or VFO to channel
-ENABLE_RX_SIGNAL_BAR             := 1       enable a menu option for showing an RSSI bar graph
 ENABLE_TX_AUDIO_BAR              := 1       enable a menu option for showing a TX audio level bar
 ENABLE_SIDE_BUTT_MENU            := 1       enable menu option for configuring the programmable side buttons
 ENABLE_KEYLOCK                   := 1       enable keylock menu option + keylock code
-#ENABLE_PANADAPTER               := 0       not yet implemented - spectrum/pan-adapter
-#ENABLE_SINGLE_VFO_CHAN          := 0       not yet implemented - single VFO on display when possible
+ENABLE_PANADAPTER                := 0       centered on the selected VFO RX frequency, only shows if dual-watch is disabled
+ENABLE_PANADAPTER_PEAK_FREQ      := 0       show the peak panadapter frequency
+ENABLE_SINGLE_VFO_CHAN           := 1       switch to single VFO display when dual-watch and cross-VFO are disabled
 ```
 
 # New/modified function keys
 
-* Long-press 'M' .. Copy selected channel into same VFO, then switch VFO to frequency mode
+* Long-press 'M' ... Remove current frequency from ignore list (only if it's in the ignore frequency list)
+* Long-press 'M' ... Copy current frequency into a channel (takes you into the channel save menu)
+* Long-press 'M' ... Copy current channel into the same VFO, then switch the VFO to frequency mode
 *
-* Long-press '7' .. Toggle selected channel scanlist setting .. if VOX  is disabled in Makefile
+* Long-press '5' ... Toggle selected channel scanlist setting (if NOAA is disabled in Makefile)
 * or
-* Long-press '5' .. Toggle selected channel scanlist setting .. if NOAA is disabled in Makefile
+* Long-press '7' ... Toggle selected channel scanlist setting (if VOX  is disabled in Makefile)
 *
-* Long-press '*' .. Start scanning, then toggles the scanning between scanlists 1, 2 or ALL channels
+* Long-press '*' ... Start scanning, then toggles the scanning between scanlists 1, 2 or ALL channels
+*
+* Short-press '*' .. Add current frequency to the frequency ignore list (only if in frequency scan mode)
 
 # Edit channel/memory name
 
@@ -123,7 +130,7 @@ ENABLE_KEYLOCK                   := 1       enable keylock menu option + keylock
 
 Press the Exit button at any time to cancel the edit and return to the main menu.
 
-Sounds a lot/complicated but once you done it a couple of times you'll be fine (hopefully).
+Sounds complicated but once you done it a couple of times you'll be fine.
 
 When you're editing the name, you can enter digits (0 ~ 9) directly without having to use the up/down buttons to find them.
 
@@ -218,15 +225,14 @@ You may obtain a copy of the License at
 
 <p float="left">
   <img src="/images/image1.png" width=300 />
-  <img src="/images/image2.png" width=300 />
-  <img src="/images/image3.png" width=300 />
+  <img src="/images/image4.png" width=300 />
+  <img src="/images/single_vfo_mode.jpg" width=600 />
 </p>
 
-Video showing the AM fix working ..
+ <img src="/images/UV_K5_8_antenna.png" />
+ <img src="/images/UV_K5_8_antenna_text.png" />
 
-<video src="/images/AM_fix.mp4"></video>
-
-<video src="https://github.com/OneOfEleven/uv-k5-firmware-custom/assets/51590168/2a3a9cdc-97da-4966-bf0d-1ce6ad09779c"></video>
+<video src="https://github.com/OneOfEleven/uv-k5-firmware-custom/assets/51590168/921162a7-e9f2-4023-b4d5-526567f8b989"></video>
 
 # WARNING if trying to use K5/K6 to TX out of band ..
 

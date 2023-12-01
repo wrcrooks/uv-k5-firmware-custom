@@ -58,7 +58,10 @@ void SystickHandler(void)
 		g_next_time_slice_500ms = true;
 		
 		DECREMENT_AND_TRIGGER(g_tx_timer_tick_500ms, g_tx_timeout_reached);
-		DECREMENT(g_serial_config_tick_500ms);
+
+		#if defined(ENABLE_UART)
+			DECREMENT(g_serial_config_tick_500ms);
+		#endif
 	}
 
 	if ((g_global_sys_tick_counter & 3) == 0)
@@ -73,7 +76,7 @@ void SystickHandler(void)
 	DECREMENT(g_found_ctcss_tick_10ms);
 
 	if (g_current_function == FUNCTION_FOREGROUND)
-		DECREMENT_AND_TRIGGER(g_schedule_power_save_tick_10ms, g_schedule_power_save);
+		DECREMENT_AND_TRIGGER(g_power_save_pause_tick_10ms, g_power_save_pause_done);
 
 	if (g_current_function == FUNCTION_POWER_SAVE)
 		DECREMENT_AND_TRIGGER(g_power_save_tick_10ms, g_power_save_expired);

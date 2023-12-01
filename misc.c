@@ -31,23 +31,28 @@ const uint16_t        fm_play_noscan_10ms              =  1200 / 10;    // 1.2 s
 const uint8_t         menu_timeout_500ms               =  30000 / 500;  // 30 seconds
 const uint16_t        menu_timeout_long_500ms          = 120000 / 500;  // 2 minutes
 
-const uint16_t        backlight_tx_rx_time_500ms       =  10000 / 500;  // 10 seconds
+const uint16_t        backlight_tx_rx_time_secs        =  10;           // 10 seconds
 
-const uint8_t         dtmf_rx_live_timeout_500ms       =   6000 / 500;  // 6 seconds live decoder on screen
+#ifdef ENABLE_DTMF_LIVE_DECODER
+	const uint8_t     dtmf_rx_live_timeout_500ms       =   6000 / 500;  // 6 seconds live decoder on screen
+#endif
 const uint8_t         dtmf_rx_timeout_500ms            =  10000 / 500;  // 10 seconds till we wipe the DTMF receiver
 const uint8_t         dtmf_decode_ring_500ms           =  15000 / 500;  // 15 seconds .. time we sound the ringing for
 const uint8_t         dtmf_txstop_500ms                =   3000 / 500;  // 6 seconds
 
 const uint8_t         serial_config_tick_500ms         =   3000 / 500;  // 3 seconds
 
-const uint8_t         key_input_timeout_500ms          =   6000 / 500;  // 6 seconds
+const uint8_t         key_input_timeout_500ms          =   8000 / 500;  // 8 seconds
 #ifdef ENABLE_KEYLOCK
 	const uint8_t     key_lock_timeout_500ms           =  30000 / 500;  // 30 seconds
 #endif
 
 const uint8_t         key_debounce_10ms                =     30 / 10;   // 30ms
-const uint8_t         key_long_press_10ms              =    300 / 10;   // 300ms
-const uint8_t         key_repeat_10ms                  =     50 / 10;   // 50ms
+const uint8_t         key_side_long_press_10ms         =   1000 / 10;   // 1 second
+const uint8_t         key_long_press_10ms              =    320 / 10;   // 320ms
+const uint8_t         key_repeat_initial_10ms          =    200 / 10;   // 200ms
+const uint8_t         key_repeat_fastest_10ms          =     10 / 10;   // 10ms
+const uint16_t        key_repeat_speedup_10ms          =   2500 / 10;   // speed-up key repeat once every 2.5 seconds
 
 const uint16_t        search_freq_css_10ms             =  10000 / 10;   // 10 seconds
 const uint16_t        search_10ms                      =    210 / 10;   // 210ms .. don't reduce this
@@ -66,8 +71,7 @@ const uint16_t        scan_pause_cdcss_10ms            =    300 / 10;   // 300ms
 const uint16_t        scan_pause_freq_10ms             =    100 / 10;   // 100ms
 const uint16_t        scan_pause_chan_10ms             =    200 / 10;   // 200ms
 
-const uint16_t        battery_save_count_10ms          =  10000 / 10;   // 10 seconds
-
+const uint16_t        power_save_pause_10ms            =  10000 / 10;   // 10 seconds
 const uint16_t        power_save1_10ms                 =    100 / 10;   // 100ms
 const uint16_t        power_save2_10ms                 =    200 / 10;   // 200ms
 
@@ -85,20 +89,23 @@ const uint32_t        g_default_aes_key[4]             = {0x4AA5CC60, 0x0312CC5F
 
 const uint8_t         g_mic_gain_dB_2[5]               = {3, 8, 16, 24, 31};
 
+uint8_t               g_mic_sensitivity_tuning;
+
 bool                  g_monitor_enabled;
 
 bool                  g_has_aes_key;
 uint32_t              g_challenge[4];
 
-volatile uint16_t     g_schedule_power_save_tick_10ms = battery_save_count_10ms;
-volatile bool         g_schedule_power_save;
-
+volatile uint16_t     g_power_save_pause_tick_10ms = power_save_pause_10ms;
+volatile bool         g_power_save_pause_done;
 volatile bool         g_power_save_expired;
 
 volatile uint16_t     g_dual_watch_tick_10ms;
 volatile bool         g_dual_watch_delay_down_expired = true;
 
-volatile uint8_t      g_serial_config_tick_500ms;
+#if defined(ENABLE_UART)
+	volatile uint8_t  g_serial_config_tick_500ms;
+#endif
 
 volatile bool         g_next_time_slice_500ms;
 
@@ -118,10 +125,17 @@ uint8_t               g_key_input_count_down;
 	uint8_t           g_key_lock_tick_500ms;
 #endif
 uint8_t               g_rtte_count_down;
-bool                  g_password_locked;
+
 uint8_t               g_update_status;
+bool                  g_update_display;
+bool                  g_update_rssi;
+bool                  g_update_menu;
+
+bool                  g_password_locked;
+
 uint8_t               g_found_ctcss;
 uint8_t               g_found_cdcss;
+
 bool                  g_end_of_rx_detected_maybe;
 
 int16_t               g_vfo_rssi[2];
@@ -129,8 +143,6 @@ uint8_t               g_vfo_rssi_bar_level[2];
 
 uint8_t               g_reduced_service;
 uint8_t               g_battery_voltage_index;
-css_scan_mode_t       g_css_scan_mode;
-bool                  g_update_rssi;
 #if defined(ENABLE_ALARM) || defined(ENABLE_TX1750)
 	alarm_state_t     g_alarm_state;
 #endif
@@ -143,18 +155,18 @@ uint8_t               g_request_save_channel;
 bool                  g_request_save_settings;
 #ifdef ENABLE_FMRADIO
 	bool              g_request_save_fm;
+	bool              g_flag_save_fm;
 #endif
+
 bool                  g_flag_prepare_tx;
 
 bool                  g_flag_accept_setting;
-bool                  g_flag_refresh_menu;
 
 bool                  g_flag_save_vfo;
 bool                  g_flag_save_settings;
 bool                  g_flag_save_channel;
-#ifdef ENABLE_FMRADIO
-	bool              g_flag_save_fm;
-#endif
+
+css_scan_mode_t       g_css_scan_mode;
 
 bool                  g_cdcss_lost;
 uint8_t               g_cdcss_code_type;
@@ -162,23 +174,23 @@ bool                  g_ctcss_lost;
 bool                  g_cxcss_tail_found;
 uint8_t               g_ctcss_tail_phase_shift_rx;
 
-
 #ifdef ENABLE_VOX
 	bool              g_vox_lost;
 	bool              g_vox_audio_detected;
 	uint16_t          g_vox_resume_tick_10ms;
 	uint16_t          g_vox_pause_tick_10ms;
+	volatile uint16_t g_vox_stop_tick_10ms;
 #endif
 
 bool                  g_squelch_open;
+reception_mode_t      g_rx_reception_mode;
 
 uint8_t               g_flash_light_state;
 uint16_t              g_flash_light_blink_tick_10ms;
 
 bool                  g_flag_end_tx;
-uint16_t              g_low_battery_tick_10ms;
 
-reception_mode_t      g_rx_reception_mode;
+uint16_t              g_low_battery_tick_10ms;
 
 uint32_t              g_scan_initial_lower;
 uint32_t              g_scan_initial_upper;
@@ -198,6 +210,7 @@ bool                  g_rx_vfo_is_active;
 	uint16_t          g_alarm_tone_counter_10ms;
 	uint16_t          g_alarm_running_counter_10ms;
 #endif
+
 uint8_t               g_menu_list_count;
 
 uint8_t               g_backup_cross_vfo;
@@ -205,32 +218,34 @@ uint8_t               g_backup_cross_vfo;
 #ifdef ENABLE_NOAA
 	bool              g_noaa_mode;
 	uint8_t           g_noaa_channel;
+	volatile uint16_t g_noaa_tick_10ms;
+	volatile bool     g_schedule_noaa  = true;
 #endif
 
-bool                  g_update_display;
-
-bool                  g_unhide_hidden = false;
+bool                  g_unhide_hidden;
 
 volatile bool         g_next_time_slice;
+volatile bool         g_next_time_slice_40ms;
+
 volatile uint8_t      g_found_cdcss_tick_10ms;
 volatile uint8_t      g_found_ctcss_tick_10ms;
-#ifdef ENABLE_VOX
-	volatile uint16_t g_vox_stop_tick_10ms;
-#endif
-volatile bool         g_next_time_slice_40ms;
-#ifdef ENABLE_NOAA
-	volatile uint16_t g_noaa_tick_10ms = 0;
-	volatile bool     g_schedule_noaa       = true;
-#endif
+
 volatile bool         g_flag_tail_tone_elimination_complete;
 
 volatile uint16_t     g_boot_tick_10ms = 4000 / 10;   // 4 seconds
 
-int16_t               g_current_rssi[2]   = {0, 0};
-uint16_t              g_current_glitch[2] = {0, 0};
-uint16_t              g_current_noise[2]  = {0, 0};
+int16_t               g_current_rssi[2];
+uint16_t              g_current_glitch[2];
+uint16_t              g_current_noise[2];
 
-uint8_t               g_mic_sensitivity_tuning;
+// original QS front end register settings
+// 0x03BE   00000 011 101 11 110
+const uint8_t         g_orig_lnas  = 3;   //   0dB
+const uint8_t         g_orig_lna   = 5;   //  -4dB
+const uint8_t         g_orig_mixer = 3;   //   0dB
+const uint8_t         g_orig_pga   = 6;   //  -3dB
+
+// ***************************
 
 unsigned int get_RX_VFO(void)
 {
@@ -325,4 +340,19 @@ void NUMBER_trim_trailing_zeros(char *str)
 				str[i--] = 0;
 		}
 	}
+}
+
+// linear search, ascending, using addition
+uint16_t NUMBER_isqrt(const uint32_t y)
+{
+	uint16_t L = 0;
+	uint32_t a = 1;
+	uint32_t d = 3;
+	while (a <= y)
+	{
+		a += d;	// (a + 1) ^ 2
+		d += 2;
+		L += 1;
+	}
+	return L;
 }

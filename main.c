@@ -63,7 +63,7 @@ void MAIN_DisplayReleaseKeys(void)
 	ST7565_BlitStatusLine();  // blank status line
 	ST7565_BlitFullScreen();
 
-	GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BACKLIGHT);  // backlight on
+	BACKLIGHT_turn_on(0);
 }
 
 void MAIN_DisplayPowerOn(void)
@@ -146,7 +146,7 @@ void MAIN_DisplayPowerOn(void)
 	}
 
 	if (g_eeprom.config.setting.power_on_display_mode != PWR_ON_DISPLAY_MODE_NONE)
-		backlight_turn_on(0);   // turn the back light on
+		BACKLIGHT_turn_on(0);   // turn the back light on
 }
 
 void Main(void)
@@ -163,7 +163,8 @@ void Main(void)
 		| SYSCON_DEV_CLK_GATE_SPI0_BITS_ENABLE
 		| SYSCON_DEV_CLK_GATE_SARADC_BITS_ENABLE
 		| SYSCON_DEV_CLK_GATE_CRC_BITS_ENABLE
-		| SYSCON_DEV_CLK_GATE_AES_BITS_ENABLE;
+		| SYSCON_DEV_CLK_GATE_AES_BITS_ENABLE
+		| SYSCON_DEV_CLK_GATE_PWM_PLUS0_BITS_ENABLE;
 
 	SYSTICK_Init();
 
@@ -174,6 +175,7 @@ void Main(void)
 		UART_Init();
 	#endif
 	BOARD_ADC_Init();
+	BACKLIGHT_init();
 	ST7565_Init(true);
 	#ifdef ENABLE_FMRADIO
 		BK1080_Init(0, false);
@@ -186,16 +188,21 @@ void Main(void)
 	#if defined(ENABLE_UART)
 		UART_SendText(UART_Version_str);
 		UART_SendText("\r\n");
+		{
+			//const unsigned long *unique = (const unsigned long *)0x1FFFF7E8;  // STM32 M0
+			//UART_printf("serial num %08X %08X %08X\r\n", unique[0], unique[1], unique[2]);
+		}
 	#endif
 
 	BootMode = BOOT_GetMode();
 	g_unhide_hidden = (BootMode == BOOT_MODE_UNHIDE_HIDDEN); // flag to say include the hidden menu items
 
-	if (!GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT) ||
-	     KEYBOARD_Poll() != KEY_INVALID ||
-		 BootMode != BOOT_MODE_NORMAL)
+	BACKLIGHT_turn_on(2000);    // turn the backlight ON
+
+	if (!GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT) || KEYBOARD_Poll() != KEY_INVALID || BootMode != BOOT_MODE_NORMAL)
 	{
 		MAIN_DisplayReleaseKeys();
+//		BACKLIGHT_turn_on(2000);    // turn the backlight ON
 	}
 	else
 	{
@@ -253,9 +260,7 @@ void Main(void)
 	UI_SortMenu(!g_unhide_hidden);
 
 	// wait for user to release all buttons before moving on
-	if (!GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT) ||
-	     KEYBOARD_Poll() != KEY_INVALID ||
-		 BootMode != BOOT_MODE_NORMAL)
+	if (!GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT) || KEYBOARD_Poll() != KEY_INVALID || BootMode != BOOT_MODE_NORMAL)
 	{
 		MAIN_DisplayReleaseKeys();
 		i = 0;
@@ -271,15 +276,15 @@ void Main(void)
 		FUNCTION_Select(FUNCTION_POWER_SAVE);
 
 		if (g_eeprom.config.setting.backlight_time < (ARRAY_SIZE(g_sub_menu_backlight) - 1))
-			GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BACKLIGHT);   // turn the backlight OFF
+			BACKLIGHT_turn_off();
 		else
-			backlight_turn_on(0);                               // turn the backlight ON
+			BACKLIGHT_turn_on(0);                               // turn the backlight ON
 
 		g_reduced_service = true;
 	}
 	else
 	{
-		backlight_turn_on(0);
+		BACKLIGHT_turn_on(0);
 
 		MAIN_DisplayPowerOn();
 

@@ -179,8 +179,7 @@ void FUNCTION_Select(function_type_t Function)
 			g_tx_timeout_reached  = false;
 			g_flag_end_tx         = false;
 		
-			g_rtte_count_down     = 0;
-			g_dtmf_reply_state    = DTMF_REPLY_NONE;
+			g_rtte_count_down = 0;
 		
 			#if defined(ENABLE_ALARM) || defined(ENABLE_TX1750)
 				if (g_alarm_state == ALARM_STATE_OFF)
@@ -196,7 +195,7 @@ void FUNCTION_Select(function_type_t Function)
 			}
 
 			if (g_eeprom.config.setting.backlight_on_tx_rx == 1 || g_eeprom.config.setting.backlight_on_tx_rx == 3)
-				backlight_turn_on(backlight_tx_rx_time_500ms);
+				BACKLIGHT_turn_on(backlight_tx_rx_time_secs);
 
 			if (g_eeprom.config.setting.dual_watch != DUAL_WATCH_OFF)
 			{	// dual-RX is enabled
@@ -216,9 +215,11 @@ void FUNCTION_Select(function_type_t Function)
 			// clear the DTMF RX buffer
 			DTMF_clear_RX();
 
-			// clear the DTMF RX live decoder buffer
-			g_dtmf_rx_live_timeout = 0;
-			memset(g_dtmf_rx_live, 0, sizeof(g_dtmf_rx_live));
+			#ifdef ENABLE_DTMF_LIVE_DECODER
+				// clear the DTMF RX live decoder buffer
+				g_dtmf_rx_live_timeout = 0;
+				memset(g_dtmf_rx_live, 0, sizeof(g_dtmf_rx_live));
+			#endif
 
 			#ifdef ENABLE_FMRADIO
 				// disable the FM radio
@@ -233,6 +234,10 @@ void FUNCTION_Select(function_type_t Function)
 			BK4819_set_scrambler(0);
 
 			RADIO_enableTX(false);
+
+			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
+//				UART_printf("function tx %u %s\r\n", g_dtmf_reply_state, g_dtmf_string);
+			#endif
 
 			#if defined(ENABLE_ALARM) || defined(ENABLE_TX1750)
 				if (g_alarm_state != ALARM_STATE_OFF)
@@ -291,17 +296,10 @@ void FUNCTION_Select(function_type_t Function)
 				BK4819_set_scrambler(g_current_vfo->channel.scrambler);
 			
 			break;
-
-		case FUNCTION_PANADAPTER:
-			#if defined(ENABLE_UART) && defined(ENABLE_UART_DEBUG)
-				UART_SendText("func panadpter\r\n");
-			#endif
-
-			break;
 	}
 
-	g_schedule_power_save_tick_10ms = battery_save_count_10ms;
-	g_schedule_power_save          = false;
+	g_power_save_pause_tick_10ms = power_save_pause_10ms;
+	g_power_save_pause_done      = false;
 
 	#ifdef ENABLE_FMRADIO
 		g_fm_restore_tick_10ms = 0;
